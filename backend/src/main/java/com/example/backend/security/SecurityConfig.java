@@ -18,6 +18,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())    // Disables CSRF protection so POST requests work
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/vault/**").permitAll() // Opens our specific endpoints
+                        .requestMatchers("/api/subscribers/**").permitAll() // Add this line
                         .anyRequest().authenticated()
                 );
         return http.build();
