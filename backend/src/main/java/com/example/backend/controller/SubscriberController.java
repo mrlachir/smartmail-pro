@@ -46,4 +46,8 @@ public class SubscriberController {
             return ResponseEntity.internalServerError().body(Map.of("message", "Error deleting subscriber."));
         }
     }
+    @GetMapping("/attributes")
+    public ResponseEntity<List<String>> getAvailableAttributes() {
+        return ResponseEntity.ok(subscriberService.getUniqueCustomAttributes());
+    }
 }

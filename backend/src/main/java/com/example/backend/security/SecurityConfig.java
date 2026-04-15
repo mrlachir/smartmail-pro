@@ -19,6 +19,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/vault/**").permitAll() // Opens our specific endpoints
                         .requestMatchers("/api/subscribers/**").permitAll() // Add this line
+                        .requestMatchers("/api/segments/**").permitAll() // Add this line
                         .anyRequest().authenticated()
                 );
         return http.build();

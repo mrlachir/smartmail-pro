@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SubscriberService {
@@ -17,40 +18,57 @@ public class SubscriberService {
     @Autowired
     private SubscriberRepository subscriberRepository;
 
-    // This method expects a CSV file where columns are: Email, FirstName, LastName
     public int importCsv(MultipartFile file) {
         int importedCount = 0;
 
         try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
-            boolean isFirstLine = true; // Skip the header row (e.g., "email,first_name,last_name")
+            String[] headers = null;
 
             while ((line = br.readLine()) != null) {
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue;
-                }
-
                 String[] columns = line.split(",");
-                if (columns.length < 1) continue; // Skip empty lines
 
-                String email = columns[0].trim();
-
-                // If the email is blank or already exists, skip it to prevent crashes
-                if (email.isEmpty() || subscriberRepository.existsByEmail(email)) {
+                // Capture the first row as headers
+                if (headers == null) {
+                    headers = columns;
+                    for (int i = 0; i < headers.length; i++) {
+                        headers[i] = headers[i].trim().toLowerCase(); // Normalize headers
+                    }
                     continue;
                 }
+
+                if (columns.length == 0) continue;
 
                 Subscriber subscriber = new Subscriber();
+                String email = null;
+
+                // Dynamically map each column based on its header
+                for (int i = 0; i < columns.length; i++) {
+                    if (i >= headers.length) break;
+
+                    String header = headers[i];
+                    String value = columns[i].trim();
+
+                    if (header.equals("email")) {
+                        email = value;
+                    } else if (header.equals("first_name") || header.equals("firstname")) {
+                        subscriber.setFirstName(value);
+                    } else if (header.equals("last_name") || header.equals("lastname")) {
+                        subscriber.setLastName(value);
+                    } else if (header.equals("status")) {
+                        subscriber.setStatus(value);
+                    } else {
+                        // Anything else goes into the dynamic JSON bucket!
+                        subscriber.getCustomAttributes().put(header, value);
+                    }
+                }
+
+                // Skip if no email, or if email already exists
+                if (email == null || email.isEmpty() || subscriberRepository.existsByEmail(email)) {
+                    continue;
+                }
+
                 subscriber.setEmail(email);
-
-                if (columns.length > 1) {
-                    subscriber.setFirstName(columns[1].trim());
-                }
-                if (columns.length > 2) {
-                    subscriber.setLastName(columns[2].trim());
-                }
-
                 subscriberRepository.save(subscriber);
                 importedCount++;
             }
@@ -61,12 +79,17 @@ public class SubscriberService {
         return importedCount;
     }
 
-    // Fetch all subscribers for the frontend table
     public List<Subscriber> getAllSubscribers() {
         return subscriberRepository.findAll();
     }
-
-    // Delete a subscriber by ID
+    // Scans all subscribers to find unique custom columns for the frontend dropdown
+    public List<String> getUniqueCustomAttributes() {
+        return subscriberRepository.findAll().stream()
+                .filter(sub -> sub.getCustomAttributes() != null) // THE FIX: Skip legacy users with null data
+                .flatMap(sub -> sub.getCustomAttributes().keySet().stream())
+                .distinct()
+                .collect(Collectors.toList());
+    }
     public void deleteSubscriber(Long id) {
         if(subscriberRepository.existsById(id)) {
             subscriberRepository.deleteById(id);
