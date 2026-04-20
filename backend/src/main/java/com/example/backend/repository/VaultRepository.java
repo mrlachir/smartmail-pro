@@ -7,5 +7,6 @@ import java.util.Optional;
 
 @Repository
 public interface VaultRepository extends JpaRepository<Vault, Long> {
+    // Delete the old findByUserId method and replace it with this:
     Optional<Vault> findByUserEmail(String email);
 }

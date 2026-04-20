@@ -16,6 +16,10 @@ function SegmentsContent() {
   const [evaluatedSubscribers, setEvaluatedSubscribers] = useState(null);
   const [viewingSegmentName, setViewingSegmentName] = useState("");
 
+  // AI State
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
   const fetchSegments = async () => {
     if (!session?.user?.email) return;
     try {
@@ -43,7 +47,6 @@ function SegmentsContent() {
     }
   };
 
-  // Only fetch data once the session is fully loaded
   useEffect(() => {
     if (session?.user?.email) {
       fetchSegments();
@@ -115,7 +118,7 @@ function SegmentsContent() {
             "Content-Type": "application/json",
             "X-User-Email": session.user.email 
         },
-        body: JSON.stringify({ name, description, rules: JSON.stringify(rules) }),
+body: JSON.stringify({ name, description, rules: JSON.stringify(rules), byAi: "manual" }),
       });
 
       if (res.ok) {
@@ -159,6 +162,70 @@ function SegmentsContent() {
     }
   };
 
+const handleAiSuggest = async () => {
+    setIsAiLoading(true);
+    setMessage("🤖 Asking Gemini to analyze your database structure...");
+    try {
+      const res = await fetch("http://localhost:8080/api/ai/suggest-segments", {
+        headers: { "X-User-Email": session.user.email }
+      });
+      
+      if (res.ok) {
+        const rawText = await res.text();
+        try {
+            const parsedData = JSON.parse(rawText);
+            setAiSuggestions(parsedData);
+            setMessage("✅ AI generated new segment strategies.");
+        } catch (parseError) {
+            console.error("Failed to parse JSON from AI", rawText);
+            setMessage("❌ AI returned invalid data format.");
+        }
+      } else {
+        // THE FIX: Extract and show the actual error from Spring Boot
+        let errorMsg = "Failed to get AI suggestions.";
+        try {
+            const errData = await res.json();
+            if (errData.message) errorMsg = errData.message;
+        } catch (e) { }
+        setMessage(`❌ ${errorMsg}`);
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ Error connecting to AI service.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async (suggestion) => {
+    try {
+      const res = await fetch("http://localhost:8080/api/segments", {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json",
+            "X-User-Email": session.user.email 
+        },
+        // THE UPGRADE: Tag as AI
+        body: JSON.stringify({ 
+            name: suggestion.name, 
+            description: suggestion.description, 
+            rules: JSON.stringify(suggestion.rules),
+            byAi: "ai" 
+        }),
+      });
+
+      if (res.ok) {
+        setMessage(`✅ Saved AI Segment: ${suggestion.name}`);
+        setAiSuggestions(prev => prev.filter(s => s.name !== suggestion.name));
+        fetchSegments(); 
+      } else {
+        setMessage("❌ Failed to save AI segment.");
+      }
+    } catch (error) {
+      setMessage("❌ Error connecting to server.");
+    }
+  };
+
   if (status === "loading") return <p className="p-8">Loading...</p>;
   if (!session) return <p className="p-8 text-red-500">Access Denied. Please log in first.</p>;
 
@@ -167,7 +234,49 @@ function SegmentsContent() {
       
       {/* Left Column */}
       <div>
-        <h1 className="text-2xl font-bold mb-6 bg-white p-4 rounded shadow">Segment Builder</h1>
+        <div className="flex justify-between items-center mb-6 bg-white p-4 rounded shadow">
+            <h1 className="text-2xl font-bold">Segment Builder</h1>
+            <button 
+                onClick={handleAiSuggest} 
+                disabled={isAiLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold shadow disabled:opacity-50 flex items-center gap-2"
+            >
+                {isAiLoading ? "🧠 Analyzing..." : "✨ AI Suggestions"}
+            </button>
+        </div>
+
+        {/* AI Suggestions Box */}
+        {aiSuggestions.length > 0 && (
+            <div className="mb-8 p-6 bg-purple-50 border-2 border-purple-200 rounded shadow">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-purple-800">✨ AI Recommended Segments</h2>
+                    <button onClick={() => setAiSuggestions([])} className="text-sm font-bold text-gray-500 hover:text-gray-800">Clear</button>
+                </div>
+                <div className="space-y-4">
+                    {aiSuggestions.map((sug, idx) => (
+                        <div key={idx} className="bg-white p-4 border rounded shadow-sm flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-md">{sug.name}</h3>
+                                    <p className="text-xs text-gray-600">{sug.description}</p>
+                                </div>
+                                <button 
+                                    onClick={() => handleAcceptSuggestion(sug)}
+                                    className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded font-bold"
+                                >
+                                    Accept
+                                </button>
+                            </div>
+                            <div className="bg-gray-50 p-2 rounded text-xs font-mono border">
+                                {sug.rules.map((r, i) => (
+                                    <div key={i}>AND {r.column} {r.operator} {r.value}</div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         
         <div className={`mb-8 p-6 rounded shadow ${editingId ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-white'}`}>
           <div className="flex justify-between items-center border-b pb-2 mb-4">
@@ -185,6 +294,18 @@ function SegmentsContent() {
             <div>
               <label className="block text-sm font-medium mb-1">Segment Name</label>
               <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border rounded" placeholder="e.g., Active Berlin Users > 25" />
+            </div>
+            
+            {/* THE FIX: Added the missing Description field */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+              <textarea 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                className="w-full p-2 border rounded text-sm text-gray-700" 
+                placeholder="Explain the strategy behind this segment..."
+                rows="2"
+              ></textarea>
             </div>
             
             <div className="border p-4 bg-gray-50 rounded space-y-3">
@@ -264,8 +385,19 @@ function SegmentsContent() {
                 segments.map(seg => (
                   <tr key={seg.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-medium">
-                      {seg.name} <br/>
-                      <div className="text-xs text-gray-400 font-mono mt-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-base">{seg.name}</span>
+                        {/* THE UPGRADE: Display the origin badge */}
+                        {seg.byAi === 'ai' ? (
+                          <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-purple-200">✨ AI</span>
+                        ) : (
+                          <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-gray-200">👤 Manual</span>
+                        )}
+                      </div>
+                      
+                      {seg.description && <div className="text-xs text-gray-500 mt-1">{seg.description}</div>} 
+                      
+                      <div className="text-xs text-gray-400 font-mono mt-2 space-y-1">
                         {Array.isArray(JSON.parse(seg.rules)) 
                             ? JSON.parse(seg.rules).map((r, i) => (
                                 <div key={i}>AND {r.column} {r.operator} {r.value}</div>
@@ -274,11 +406,14 @@ function SegmentsContent() {
                         }
                       </div>
                     </td>
+                    
                     <td className="p-3 text-right space-x-3 align-top">
                       <button onClick={() => handleRunRule(seg)} className="text-green-600 font-bold hover:underline">Run</button>
                       <button onClick={() => handleEdit(seg)} className="text-blue-600 font-bold hover:underline">Edit</button>
                       <button onClick={() => handleDelete(seg.id)} className="text-red-500 hover:underline">Delete</button>
                     </td>
+                    
+
                   </tr>
                 ))
               )}

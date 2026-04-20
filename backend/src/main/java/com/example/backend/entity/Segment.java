@@ -28,6 +28,9 @@ public class Segment {
     // We store the filtering rules as a JSON string so Next.js can read/write them easily
     @Column(columnDefinition = "TEXT", nullable = false)
     private String rules;
+    // THE UPGRADE: Track if the segment was built by AI or manually
+    @Column(name = "by_ai")
+    private String byAi = "manual";
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

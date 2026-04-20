@@ -37,7 +37,7 @@ SmartMail Pro is an enterprise-grade Marketing Information System (MIS) designed
 - [x] US 3.1: CSV Contact Import
 - [x] US 3.2: Subscriber CRUD Operations
 - [x] US 4.1: Visual Rule Builder for Segmentation
-- [ ] US 4.2: AI-Suggested Segments
+- [x] US 4.2: AI-Suggested Segments
 - [ ] US 5.1: Template Management Grid
 - [ ] US 5.2: AI HTML Generation via Chat
 - [ ] US 6.1: AI Image Generation

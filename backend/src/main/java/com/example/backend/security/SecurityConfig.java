@@ -21,6 +21,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/subscribers/**").permitAll() // Add this line
                         .requestMatchers("/api/segments/**").permitAll() // Add this line
                         .requestMatchers("/api/users/**").permitAll() // ADD THIS LINE
+                        .requestMatchers("/api/ai/**").permitAll() // ADD THIS LINE
+
                         .anyRequest().authenticated()
                 );
         return http.build();
