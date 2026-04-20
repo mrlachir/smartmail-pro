@@ -110,11 +110,11 @@ public class AiSegmentService {
 //        // 7. Fire the request
 //        String baseUrl = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=)";
 //        String url = baseUrl + apiKey;
-//// 6. Fire the request (Upgraded to Gemini 2.5 Flash)
+// 6. Fire the request (Upgraded to Gemini 2.5 Flash)
         String baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
         String url = baseUrl + apiKey;
 
-        
+
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

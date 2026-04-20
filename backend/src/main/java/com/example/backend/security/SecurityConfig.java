@@ -22,6 +22,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/segments/**").permitAll() // Add this line
                         .requestMatchers("/api/users/**").permitAll() // ADD THIS LINE
                         .requestMatchers("/api/ai/**").permitAll() // ADD THIS LINE
+                        .requestMatchers("/api/templates/**").permitAll() // ADD THIS LINE
 
                         .anyRequest().authenticated()
                 );
