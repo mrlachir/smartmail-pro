@@ -9,10 +9,32 @@ function SubscribersContent() {
   const [loading, setLoading] = useState(false);
   const [subscribers, setSubscribers] = useState([]);
 
-  // Fetch subscribers on load
+  // THE HANDSHAKE: Register user and fetch their specific data
+  useEffect(() => {
+    if (session?.user?.email) {
+      const syncAndFetch = async () => {
+        try {
+          // 1. Tell backend the user is here
+          await fetch("http://localhost:8080/api/users/sync", {
+            method: "POST",
+            headers: { "X-User-Email": session.user.email }
+          });
+          // 2. Fetch their isolated data
+          fetchSubscribers();
+        } catch (error) {
+          console.error("Failed to sync user", error);
+        }
+      };
+      syncAndFetch();
+    }
+  }, [session]);
+
   const fetchSubscribers = async () => {
+    if (!session?.user?.email) return;
     try {
-      const res = await fetch("http://localhost:8080/api/subscribers");
+      const res = await fetch("http://localhost:8080/api/subscribers", {
+        headers: { "X-User-Email": session.user.email } // PASS THE IDENTIFIER
+      });
       if (res.ok) {
         const data = await res.json();
         setSubscribers(data);
@@ -21,10 +43,6 @@ function SubscribersContent() {
       console.error("Failed to fetch subscribers", error);
     }
   };
-
-  useEffect(() => {
-    fetchSubscribers();
-  }, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -46,6 +64,7 @@ function SubscribersContent() {
     try {
       const res = await fetch("http://localhost:8080/api/subscribers/import", {
         method: "POST",
+        headers: { "X-User-Email": session.user.email }, // PASS THE IDENTIFIER
         body: formData,
       });
 
@@ -55,7 +74,7 @@ function SubscribersContent() {
         setMessage("✅ " + data.message);
         setFile(null);
         document.getElementById("csvFileInput").value = "";
-        fetchSubscribers(); // Refresh the table after upload
+        fetchSubscribers();
       } else {
         setMessage("❌ " + data.message);
       }
@@ -72,10 +91,11 @@ function SubscribersContent() {
     try {
       const res = await fetch(`http://localhost:8080/api/subscribers/${id}`, {
         method: "DELETE",
+        headers: { "X-User-Email": session.user.email } // PASS THE IDENTIFIER
       });
       
       if (res.ok) {
-        fetchSubscribers(); // Refresh the table after deletion
+        fetchSubscribers();
       } else {
         alert("Failed to delete subscriber.");
       }
@@ -91,7 +111,6 @@ function SubscribersContent() {
     <div className="max-w-4xl mx-auto p-8 mt-10 bg-white rounded shadow text-black">
       <h1 className="text-2xl font-bold mb-6">Subscriber Management</h1>
       
-      {/* Upload Section */}
       <div className="mb-8 p-6 border-2 border-dashed border-gray-300 rounded text-center bg-gray-50">
         <h2 className="text-lg font-semibold mb-2">Import CSV Contacts</h2>
         <p className="text-sm text-gray-500 mb-4">Format Requirement: Email, FirstName, LastName</p>
@@ -115,7 +134,6 @@ function SubscribersContent() {
         {message && <p className="mt-4 font-medium">{message}</p>}
       </div>
 
-      {/* Table Section */}
       <h2 className="text-xl font-bold mb-4">Subscriber List ({subscribers.length})</h2>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse border border-gray-200 text-sm">

@@ -19,29 +19,28 @@ public class SegmentController {
     private SegmentService segmentService;
 
     @PostMapping
-    public ResponseEntity<Segment> createSegment(@RequestBody Segment segment) {
-        return ResponseEntity.ok(segmentService.saveSegment(segment));
+    public ResponseEntity<Segment> createSegment(@RequestBody Segment segment, @RequestHeader("X-User-Email") String userEmail) {
+        return ResponseEntity.ok(segmentService.saveSegment(segment, userEmail));
     }
 
     @GetMapping
-    public ResponseEntity<List<Segment>> getAllSegments() {
-        return ResponseEntity.ok(segmentService.getAllSegments());
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteSegment(@PathVariable Long id) {
-        segmentService.deleteSegment(id);
-        return ResponseEntity.ok(Map.of("message", "Segment deleted"));
-    }
-
-    // This endpoint triggers the engine to run the rules and return the matching users
-    @GetMapping("/{id}/subscribers")
-    public ResponseEntity<List<Subscriber>> evaluateSegment(@PathVariable Long id) {
-        return ResponseEntity.ok(segmentService.getSubscribersInSegment(id));
+    public ResponseEntity<List<Segment>> getAllSegments(@RequestHeader("X-User-Email") String userEmail) {
+        return ResponseEntity.ok(segmentService.getAllSegments(userEmail));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Segment> updateSegment(@PathVariable Long id, @RequestBody Segment segment) {
-        return ResponseEntity.ok(segmentService.updateSegment(id, segment));
+    public ResponseEntity<Segment> updateSegment(@PathVariable Long id, @RequestBody Segment segment, @RequestHeader("X-User-Email") String userEmail) {
+        return ResponseEntity.ok(segmentService.updateSegment(id, segment, userEmail));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteSegment(@PathVariable Long id, @RequestHeader("X-User-Email") String userEmail) {
+        segmentService.deleteSegment(id, userEmail);
+        return ResponseEntity.ok(Map.of("message", "Segment deleted"));
+    }
+
+    @GetMapping("/{id}/subscribers")
+    public ResponseEntity<List<Subscriber>> evaluateSegment(@PathVariable Long id, @RequestHeader("X-User-Email") String userEmail) {
+        return ResponseEntity.ok(segmentService.getSubscribersInSegment(id, userEmail));
     }
 }

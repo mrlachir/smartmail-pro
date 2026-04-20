@@ -1,5 +1,6 @@
 package com.example.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -28,6 +29,12 @@ public class Subscriber {
 
     @Column(nullable = false)
     private String status = "Active";
+
+    // THE UPGRADE: Maps this subscriber strictly to one user
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore // Prevents infinite JSON loops when sending data to Next.js
+    private User user;
 
     // This is the bucket your Service is looking for
     @JdbcTypeCode(SqlTypes.JSON)

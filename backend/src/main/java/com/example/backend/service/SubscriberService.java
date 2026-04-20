@@ -1,6 +1,7 @@
 package com.example.backend.service;
 
 import com.example.backend.entity.Subscriber;
+import com.example.backend.entity.User;
 import com.example.backend.repository.SubscriberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,12 @@ public class SubscriberService {
     @Autowired
     private SubscriberRepository subscriberRepository;
 
-    public int importCsv(MultipartFile file) {
+    @Autowired
+    private UserService userService; // Injects our new User logic
+
+    public int importCsv(MultipartFile file, String userEmail) {
+        // Find the user in the database, or create them if it's their first time
+        User currentUser = userService.getOrCreateUser(userEmail);
         int importedCount = 0;
 
         try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -28,11 +34,10 @@ public class SubscriberService {
             while ((line = br.readLine()) != null) {
                 String[] columns = line.split(",");
 
-                // Capture the first row as headers
                 if (headers == null) {
                     headers = columns;
                     for (int i = 0; i < headers.length; i++) {
-                        headers[i] = headers[i].trim().toLowerCase(); // Normalize headers
+                        headers[i] = headers[i].trim().toLowerCase();
                     }
                     continue;
                 }
@@ -40,12 +45,11 @@ public class SubscriberService {
                 if (columns.length == 0) continue;
 
                 Subscriber subscriber = new Subscriber();
+                subscriber.setUser(currentUser); // Lock this subscriber to the logged-in user
                 String email = null;
 
-                // Dynamically map each column based on its header
                 for (int i = 0; i < columns.length; i++) {
                     if (i >= headers.length) break;
-
                     String header = headers[i];
                     String value = columns[i].trim();
 
@@ -58,13 +62,12 @@ public class SubscriberService {
                     } else if (header.equals("status")) {
                         subscriber.setStatus(value);
                     } else {
-                        // Anything else goes into the dynamic JSON bucket!
                         subscriber.getCustomAttributes().put(header, value);
                     }
                 }
 
-                // Skip if no email, or if email already exists
-                if (email == null || email.isEmpty() || subscriberRepository.existsByEmail(email)) {
+                // THE FIX: Check if THIS user already has this email
+                if (email == null || email.isEmpty() || subscriberRepository.existsByEmailAndUserEmail(email, userEmail)) {
                     continue;
                 }
 
@@ -79,20 +82,26 @@ public class SubscriberService {
         return importedCount;
     }
 
-    public List<Subscriber> getAllSubscribers() {
-        return subscriberRepository.findAll();
+    public List<Subscriber> getAllSubscribers(String userEmail) {
+        // Only return subscribers belonging to this user
+        return subscriberRepository.findByUserEmail(userEmail);
     }
-    // Scans all subscribers to find unique custom columns for the frontend dropdown
-    public List<String> getUniqueCustomAttributes() {
-        return subscriberRepository.findAll().stream()
-                .filter(sub -> sub.getCustomAttributes() != null) // THE FIX: Skip legacy users with null data
+
+    public void deleteSubscriber(Long id, String userEmail) {
+        // Verify ownership before deleting
+        subscriberRepository.findById(id).ifPresent(sub -> {
+            if (sub.getUser().getEmail().equals(userEmail)) {
+                subscriberRepository.deleteById(id);
+            }
+        });
+    }
+
+    public List<String> getUniqueCustomAttributes(String userEmail) {
+        // Only scan this specific user's attributes
+        return subscriberRepository.findByUserEmail(userEmail).stream()
+                .filter(sub -> sub.getCustomAttributes() != null)
                 .flatMap(sub -> sub.getCustomAttributes().keySet().stream())
                 .distinct()
                 .collect(Collectors.toList());
-    }
-    public void deleteSubscriber(Long id) {
-        if(subscriberRepository.existsById(id)) {
-            subscriberRepository.deleteById(id);
-        }
     }
 }

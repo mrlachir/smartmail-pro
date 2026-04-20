@@ -6,8 +6,7 @@ function SegmentsContent() {
   const { data: session, status } = useSession();
   const [segments, setSegments] = useState([]);
   
-  // Form State
-  const [editingId, setEditingId] = useState(null); // NEW: Tracks if we are editing
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [rules, setRules] = useState([{ column: "status", operator: "=", value: "" }]);
@@ -18,8 +17,11 @@ function SegmentsContent() {
   const [viewingSegmentName, setViewingSegmentName] = useState("");
 
   const fetchSegments = async () => {
+    if (!session?.user?.email) return;
     try {
-      const res = await fetch("http://localhost:8080/api/segments");
+      const res = await fetch("http://localhost:8080/api/segments", {
+        headers: { "X-User-Email": session.user.email }
+      });
       if (res.ok) setSegments(await res.json());
     } catch (error) {
       console.error("Failed to fetch segments");
@@ -27,8 +29,11 @@ function SegmentsContent() {
   };
 
   const fetchAttributes = async () => {
+    if (!session?.user?.email) return;
     try {
-      const res = await fetch("http://localhost:8080/api/subscribers/attributes");
+      const res = await fetch("http://localhost:8080/api/subscribers/attributes", {
+        headers: { "X-User-Email": session.user.email }
+      });
       if (res.ok) {
         const data = await res.json();
         setAvailableColumns(["status", ...data]);
@@ -38,10 +43,13 @@ function SegmentsContent() {
     }
   };
 
+  // Only fetch data once the session is fully loaded
   useEffect(() => {
-    fetchSegments();
-    fetchAttributes();
-  }, []);
+    if (session?.user?.email) {
+      fetchSegments();
+      fetchAttributes();
+    }
+  }, [session]);
 
   const handleAddRule = () => {
     setRules([...rules, { column: "status", operator: "=", value: "" }]);
@@ -58,7 +66,6 @@ function SegmentsContent() {
     setRules(updatedRules);
   };
 
-  // NEW: Loads segment data into the form
   const handleEdit = (segment) => {
     setEditingId(segment.id);
     setName(segment.name);
@@ -66,7 +73,6 @@ function SegmentsContent() {
     
     try {
         const parsedRules = JSON.parse(segment.rules);
-        // Handle both legacy (single object) and new (array) formats
         if (Array.isArray(parsedRules)) {
             setRules(parsedRules);
         } else {
@@ -76,12 +82,10 @@ function SegmentsContent() {
         setRules([{ column: "status", operator: "=", value: "" }]);
     }
     
-    // Scroll to top to see the form
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setMessage("");
   };
 
-  // NEW: Cancels edit mode and clears the form
   const cancelEdit = () => {
     setEditingId(null);
     setName("");
@@ -99,7 +103,6 @@ function SegmentsContent() {
         return;
     }
 
-    // Determine the URL and Method based on editing mode
     const url = editingId 
         ? `http://localhost:8080/api/segments/${editingId}` 
         : "http://localhost:8080/api/segments";
@@ -108,14 +111,17 @@ function SegmentsContent() {
     try {
       const res = await fetch(url, {
         method: method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "X-User-Email": session.user.email 
+        },
         body: JSON.stringify({ name, description, rules: JSON.stringify(rules) }),
       });
 
       if (res.ok) {
         setMessage(`✅ Segment ${editingId ? 'updated' : 'saved'} successfully.`);
-        cancelEdit(); // Reset form
-        fetchSegments(); // Refresh table
+        cancelEdit(); 
+        fetchSegments(); 
       } else {
         setMessage(`❌ Failed to ${editingId ? 'update' : 'save'} segment.`);
       }
@@ -127,8 +133,11 @@ function SegmentsContent() {
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this segment?")) return;
     try {
-      await fetch(`http://localhost:8080/api/segments/${id}`, { method: "DELETE" });
-      if (editingId === id) cancelEdit(); // Clear form if they delete what they are editing
+      await fetch(`http://localhost:8080/api/segments/${id}`, { 
+          method: "DELETE",
+          headers: { "X-User-Email": session.user.email } 
+      });
+      if (editingId === id) cancelEdit(); 
       fetchSegments();
       setEvaluatedSubscribers(null);
     } catch (error) {
@@ -139,7 +148,9 @@ function SegmentsContent() {
   const handleRunRule = async (segment) => {
     setViewingSegmentName(segment.name);
     try {
-      const res = await fetch(`http://localhost:8080/api/segments/${segment.id}/subscribers`);
+      const res = await fetch(`http://localhost:8080/api/segments/${segment.id}/subscribers`, {
+          headers: { "X-User-Email": session.user.email }
+      });
       if (res.ok) {
         setEvaluatedSubscribers(await res.json());
       }

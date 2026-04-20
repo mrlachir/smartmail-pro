@@ -2,6 +2,7 @@ package com.example.backend.service;
 
 import com.example.backend.entity.Segment;
 import com.example.backend.entity.Subscriber;
+import com.example.backend.entity.User;
 import com.example.backend.repository.SegmentRepository;
 import com.example.backend.repository.SubscriberRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,22 +22,27 @@ public class SegmentService {
     @Autowired
     private SubscriberRepository subscriberRepository;
 
-    public Segment saveSegment(Segment segment) {
+    @Autowired
+    private UserService userService;
+
+    public Segment saveSegment(Segment segment, String userEmail) {
+        User user = userService.getOrCreateUser(userEmail);
+        segment.setUser(user);
         return segmentRepository.save(segment);
     }
 
-    public List<Segment> getAllSegments() {
-        return segmentRepository.findAll();
+    public List<Segment> getAllSegments(String userEmail) {
+        return segmentRepository.findByUserEmail(userEmail);
     }
 
-    public void deleteSegment(Long id) {
-        if(segmentRepository.existsById(id)) {
-            segmentRepository.deleteById(id);
-        }
-    }
-    public Segment updateSegment(Long id, Segment updatedData) {
+    public Segment updateSegment(Long id, Segment updatedData, String userEmail) {
         Segment existingSegment = segmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Segment not found"));
+
+        // SECURITY: Verify the user owns this segment before updating
+        if (!existingSegment.getUser().getEmail().equals(userEmail)) {
+            throw new RuntimeException("Unauthorized");
+        }
 
         existingSegment.setName(updatedData.getName());
         existingSegment.setDescription(updatedData.getDescription());
@@ -45,21 +51,33 @@ public class SegmentService {
         return segmentRepository.save(existingSegment);
     }
 
-    public List<Subscriber> getSubscribersInSegment(Long segmentId) {
+    public void deleteSegment(Long id, String userEmail) {
+        segmentRepository.findById(id).ifPresent(seg -> {
+            // SECURITY: Verify ownership before deleting
+            if (seg.getUser().getEmail().equals(userEmail)) {
+                segmentRepository.deleteById(id);
+            }
+        });
+    }
+
+    public List<Subscriber> getSubscribersInSegment(Long segmentId, String userEmail) {
         Segment segment = segmentRepository.findById(segmentId)
                 .orElseThrow(() -> new RuntimeException("Segment not found"));
 
-        List<Subscriber> allSubscribers = subscriberRepository.findAll();
+        if (!segment.getUser().getEmail().equals(userEmail)) {
+            throw new RuntimeException("Unauthorized access to segment");
+        }
+
+        // ONLY fetch subscribers that belong to THIS user
+        List<Subscriber> userSubscribers = subscriberRepository.findByUserEmail(userEmail);
         ObjectMapper mapper = new ObjectMapper();
 
         try {
             JsonNode rulesArray = mapper.readTree(segment.getRules());
 
-            return allSubscribers.stream().filter(sub -> {
-                // If it's not an array, or it's empty, everyone passes
+            return userSubscribers.stream().filter(sub -> {
                 if (!rulesArray.isArray() || rulesArray.isEmpty()) return true;
 
-                // Evaluate EVERY rule in the array (AND logic)
                 for (JsonNode rule : rulesArray) {
                     String targetColumn = rule.has("column") ? rule.get("column").asText() : null;
                     String operator = rule.has("operator") ? rule.get("operator").asText() : "=";
@@ -71,12 +89,10 @@ public class SegmentService {
                     if (targetColumn.equalsIgnoreCase("status")) {
                         actualValue = sub.getStatus();
                     } else {
-                        // Safely check custom attributes
                         if (sub.getCustomAttributes() == null) return false;
                         actualValue = sub.getCustomAttributes().get(targetColumn);
                     }
 
-                    // If the subscriber doesn't have this column at all, they fail this rule
                     if (actualValue == null) return false;
 
                     boolean rulePassed = false;
@@ -99,13 +115,8 @@ public class SegmentService {
                         };
                     }
 
-                    // If they fail even ONE rule, filter them out immediately
-                    if (!rulePassed) {
-                        return false;
-                    }
+                    if (!rulePassed) return false;
                 }
-
-                // If they survived the loop, they passed all rules
                 return true;
             }).collect(Collectors.toList());
 
@@ -113,5 +124,4 @@ public class SegmentService {
             throw new RuntimeException("Error parsing segment rules: " + e.getMessage());
         }
     }
-
 }
