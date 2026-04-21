@@ -23,6 +23,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").permitAll() // ADD THIS LINE
                         .requestMatchers("/api/ai/**").permitAll() // ADD THIS LINE
                         .requestMatchers("/api/templates/**").permitAll() // ADD THIS LINE
+                        .requestMatchers("/api/media/**").permitAll() // ADD THIS
+                        .requestMatchers("/uploads/**").permitAll()   // ADD THIS (Allows Next.js to view the physical images)
 
                         .anyRequest().authenticated()
                 );
