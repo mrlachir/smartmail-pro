@@ -9,11 +9,11 @@ import com.example.backend.security.EncryptionUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
@@ -22,39 +22,27 @@ import java.util.stream.Collectors;
 @Service
 public class AiSegmentService {
 
-    @Autowired
-    private SubscriberService subscriberService;
+    @Autowired private SubscriberService subscriberService;
+    @Autowired private VaultRepository vaultRepository;
+    @Autowired private EncryptionUtil encryptionUtil;
+    @Autowired private SegmentRepository segmentRepository;
 
-    @Autowired
-    private VaultRepository vaultRepository;
+    @Value("${groq.api.key}")
+    private String groqApiKey;
 
-    @Autowired
-    private EncryptionUtil encryptionUtil;
-
-    // THE UPGRADE: Inject SegmentRepository to read what already exists
-    @Autowired
-    private SegmentRepository segmentRepository;
-
-    public String getSuggestedSegments(String userEmail) {
-        // 1. DATA ISOLATION: Fetch ONLY this user's subscribers
+    public String getSuggestedSegments(String provider, String userEmail) {
         List<Subscriber> userSubscribers = subscriberService.getAllSubscribers(userEmail);
+        if (userSubscribers.isEmpty()) throw new RuntimeException("You have no subscribers. Upload a CSV first.");
 
-        if (userSubscribers.isEmpty()) {
-            throw new RuntimeException("You have no subscribers. Upload a CSV first so the AI can analyze your data.");
-        }
-
-        // 2. CONTEXT ISOLATION: Find segments the user already created
         List<Segment> existingSegments = segmentRepository.findByUserEmail(userEmail);
         String existingSegmentNames = existingSegments.isEmpty() ? "None" :
                 existingSegments.stream().map(Segment::getName).collect(Collectors.joining(", "));
 
-        // 3. Extract columns and a sample of ACTUAL VALUES
         Map<String, Set<String>> columnSamples = new HashMap<>();
         columnSamples.put("status", new HashSet<>());
 
         for (Subscriber sub : userSubscribers) {
             columnSamples.get("status").add(sub.getStatus());
-
             if (sub.getCustomAttributes() != null) {
                 for (Map.Entry<String, String> entry : sub.getCustomAttributes().entrySet()) {
                     columnSamples.putIfAbsent(entry.getKey(), new HashSet<>());
@@ -70,86 +58,74 @@ public class AiSegmentService {
             dataContext.append("- ").append(entry.getKey()).append(" (Sample values found: ").append(String.join(", ", entry.getValue())).append(")\n");
         }
 
-        // 4. Fetch and decrypt API Key securely
-        Vault vault = vaultRepository.findByUserEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("API Vault not configured. Please add your Gemini key in settings."));
+        String prompt = "You are a data-driven marketing expert. Here is my database context:\n" + dataContext.toString()
+                + "\nCRITICAL RULE: The user already has these segments: [" + existingSegmentNames + "]. Do not suggest these. "
+                + "Invent 3 NEW distinct segments based on the data provided.\n"
+                + "You MUST return ONLY a raw JSON array of objects. Do not include any conversational text or markdown formatting.\n"
+                + "Structure: [ { \"name\": \"Segment Name\", \"description\": \"Why it works\", \"rules\": [ { \"column\": \"column_name\", \"operator\": \"=\", \"value\": \"target_value\" } ] } ]. "
+                + "Valid operators: =, !=, >, <, >=, <=.";
 
-        String apiKey;
-        try {
-            apiKey = encryptionUtil.decrypt(vault.getGeminiApiKeyEncrypted()).trim();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to decrypt Gemini API Key.");
+        if ("groq".equalsIgnoreCase(provider)) {
+            return callGroqApi(prompt);
+        } else {
+            return callGeminiApi(prompt, userEmail);
         }
+    }
 
-        if (apiKey.isEmpty()) {
-            throw new RuntimeException("Gemini API Key is empty. Update your Vault.");
-        }
+    private String callGroqApi(String prompt) {
+        if (groqApiKey == null || groqApiKey.isEmpty()) throw new RuntimeException("Groq API Key is missing in properties.");
 
-        // 5. Construct the strict AI Prompt (Now with Anti-Duplication Rule)
-        String prompt = "You are a data-driven marketing expert. I have a subscriber database with the following columns and actual data samples:\n"
-                + dataContext.toString()
-                + "\nCRITICAL RULE: The user already has the following segments: [" + existingSegmentNames + "]. "
-                + "DO NOT suggest these segments. You must invent 3 NEW, distinct segments based on the data provided.\n\n"
-                + "You MUST return ONLY a raw JSON array of objects. Do not include any conversational text or markdown formatting (no ```json). "
-                + "Each object must exactly match this structure: "
-                + "{ \"name\": \"Segment Name\", \"description\": \"Why this works\", \"rules\": [ { \"column\": \"column_name\", \"operator\": \"=\", \"value\": \"target_value\" } ] }. "
-                + "Valid operators are: =, !=, >, <, >=, <=.";
-
-        // 6. Safely build the JSON request body
+        String url = "https://api.groq.com/openai/v1/chat/completions";
         ObjectMapper mapper = new ObjectMapper();
         String requestBody;
+
         try {
-            Map<String, Object> textPart = Map.of("text", prompt);
-            Map<String, Object> parts = Map.of("parts", List.of(textPart));
-            Map<String, Object> contents = Map.of("contents", List.of(parts));
-            requestBody = mapper.writeValueAsString(contents);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to construct AI request body.");
-        }
+            requestBody = mapper.writeValueAsString(Map.of(
+                    "model", "llama-3.1-8b-instant",
 
-//        // 7. Fire the request
-//        String baseUrl = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=)";
-//        String url = baseUrl + apiKey;
-// 6. Fire the request (Upgraded to Gemini 2.5 Flash)
-        String baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
-        String url = baseUrl + apiKey;
-
+                    "messages", List.of(Map.of("role", "user", "content", prompt)),
+                    "temperature", 0.7
+            ));
+        } catch (Exception e) { throw new RuntimeException("Failed to construct Groq request body."); }
 
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+        headers.setBearerAuth(groqApiKey);
 
         try {
-            String response = restTemplate.postForObject(url, entity, String.class);
-            JsonNode rootNode = mapper.readTree(response);
+            String response = restTemplate.postForObject(url, new HttpEntity<>(requestBody, headers), String.class);
+            return cleanJson(mapper.readTree(response).path("choices").get(0).path("message").path("content").asText());
+        } catch (Exception e) { throw new RuntimeException("Groq API Error: " + e.getMessage()); }
+    }
 
-            if (!rootNode.has("candidates")) {
-                throw new RuntimeException("Google rejected the API request. Check your API Key permissions.");
-            }
+    private String callGeminiApi(String prompt, String userEmail) {
+        Vault vault = vaultRepository.findByUserEmail(userEmail).orElseThrow(() -> new RuntimeException("API Vault not configured."));
+        String apiKey;
+        try { apiKey = encryptionUtil.decrypt(vault.getGeminiApiKeyEncrypted()).trim(); }
+        catch (Exception e) { throw new RuntimeException("Failed to decrypt Gemini API Key."); }
 
-            String aiText = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+        ObjectMapper mapper = new ObjectMapper();
+        String requestBody;
 
-            if (aiText.startsWith("```json")) {
-                aiText = aiText.replace("```json", "").replace("```", "").trim();
-            } else if (aiText.startsWith("```")) {
-                aiText = aiText.replace("```", "").trim();
-            }
+        try {
+            requestBody = mapper.writeValueAsString(Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))));
+        } catch (Exception e) { throw new RuntimeException("Failed to construct AI request body."); }
 
-            return aiText;
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        } catch (HttpStatusCodeException e) {
-            if (e.getStatusCode().value() == 503) {
-                throw new RuntimeException("Google's AI servers are currently overloaded. Please wait 60 seconds and try again.");
-            } else if (e.getStatusCode().value() == 400) {
-                throw new RuntimeException("Google rejected the request format. Ensure your database contains valid data.");
-            } else if (e.getStatusCode().value() == 404) {
-                throw new RuntimeException("AI Model endpoint not found. Verify the Google API URL.");
-            } else {
-                throw new RuntimeException("Google API Error: " + e.getStatusCode().value());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Unexpected AI Error: " + e.getMessage());
-        }
+        try {
+            String response = restTemplate.postForObject(url, new HttpEntity<>(requestBody, headers), String.class);
+            return cleanJson(mapper.readTree(response).path("candidates").get(0).path("content").path("parts").get(0).path("text").asText());
+        } catch (Exception e) { throw new RuntimeException("Gemini API Error: " + e.getMessage()); }
+    }
+
+    private String cleanJson(String text) {
+        if (text.startsWith("```json")) return text.replace("```json", "").replace("```", "").trim();
+        if (text.startsWith("```")) return text.replace("```", "").trim();
+        return text.trim();
     }
 }

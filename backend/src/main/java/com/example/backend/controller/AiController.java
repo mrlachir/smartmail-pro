@@ -21,47 +21,44 @@ public class AiController {
     private AiTemplateService aiTemplateService;
 
     @GetMapping("/suggest-segments")
-    public ResponseEntity<?> suggestSegments(@RequestHeader("X-User-Email") String userEmail) {
+    public ResponseEntity<?> suggestSegments(
+            @RequestParam(defaultValue = "groq") String provider, // THE UPGRADE: Accept the provider flag
+            @RequestHeader("X-User-Email") String userEmail) {
         try {
-            String jsonArray = aiSegmentService.getSuggestedSegments(userEmail);
+            String jsonArray = aiSegmentService.getSuggestedSegments(provider, userEmail);
             return ResponseEntity.ok(jsonArray);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
-    // THE UPGRADE: Expose HTML generation
     @PostMapping("/generate-template")
     public ResponseEntity<?> generateTemplate(@RequestBody Map<String, String> payload, @RequestHeader("X-User-Email") String userEmail) {
         try {
             String topic = payload.get("topic");
-            if (topic == null || topic.trim().isEmpty()) {
-                throw new RuntimeException("Topic is required.");
-            }
-            String rawHtml = aiTemplateService.generateHtmlTemplate(topic, userEmail);
-            return ResponseEntity.ok(Map.of("html", rawHtml));
+            String provider = payload.getOrDefault("provider", "groq"); // Default to the faster Groq
+            if (topic == null || topic.trim().isEmpty()) throw new RuntimeException("Topic required.");
+
+            return ResponseEntity.ok(Map.of("html", aiTemplateService.generateHtmlTemplate(topic, provider, userEmail)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-    // THE UPGRADE: Expose HTML Chatbot Refinement
+
     @PostMapping("/refine-template")
     public ResponseEntity<?> refineTemplate(@RequestBody Map<String, String> payload, @RequestHeader("X-User-Email") String userEmail) {
         try {
             String currentHtml = payload.get("currentHtml");
             String instructions = payload.get("instructions");
+            String provider = payload.getOrDefault("provider", "groq");
 
-            if (currentHtml == null || currentHtml.trim().isEmpty() || instructions == null || instructions.trim().isEmpty()) {
-                throw new RuntimeException("Both current HTML and instructions are required.");
-            }
+            if (currentHtml == null || instructions == null) throw new RuntimeException("HTML and instructions required.");
 
-            String rawHtml = aiTemplateService.refineHtmlTemplate(currentHtml, instructions, userEmail);
-            return ResponseEntity.ok(Map.of("html", rawHtml));
+            return ResponseEntity.ok(Map.of("html", aiTemplateService.refineHtmlTemplate(currentHtml, instructions, provider, userEmail)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-
     // Add this to your dependencies at the top of the class
     @Autowired
     private AiImageService aiImageService;

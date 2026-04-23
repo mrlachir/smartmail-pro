@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession, SessionProvider } from "next-auth/react";
 
 function SegmentsContent() {
+
   const { data: session, status } = useSession();
   const [segments, setSegments] = useState([]);
   
@@ -19,6 +20,10 @@ function SegmentsContent() {
   // AI State
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const [suggestions, setSuggestions] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiProvider, setAiProvider] = useState("groq"); // THE UPGRADE: Track selected engine
 
   const fetchSegments = async () => {
     if (!session?.user?.email) return;
@@ -166,7 +171,8 @@ const handleAiSuggest = async () => {
     setIsAiLoading(true);
     setMessage("🤖 Asking Gemini to analyze your database structure...");
     try {
-      const res = await fetch("http://localhost:8080/api/ai/suggest-segments", {
+      // THE UPGRADE: Pass the provider in the query string
+      const res = await fetch(`http://localhost:8080/api/ai/suggest-segments?provider=${aiProvider}`, {
         headers: { "X-User-Email": session.user.email }
       });
       
@@ -234,15 +240,33 @@ const handleAiSuggest = async () => {
       
       {/* Left Column */}
       <div>
-        <div className="flex justify-between items-center mb-6 bg-white p-4 rounded shadow">
-            <h1 className="text-2xl font-bold">Segment Builder</h1>
-            <button 
-                onClick={handleAiSuggest} 
-                disabled={isAiLoading}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold shadow disabled:opacity-50 flex items-center gap-2"
-            >
-                {isAiLoading ? "🧠 Analyzing..." : "✨ AI Suggestions"}
-            </button>
+        <div className="flex flex-col items-end gap-2 mb-6">
+            <div className="flex items-center gap-3">
+                {/* THE UPGRADE: Engine Toggle Switch */}
+                <div className="flex bg-white rounded border border-gray-300 p-0.5">
+                    <button
+                        onClick={() => setAiProvider("groq")}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${aiProvider === 'groq' ? 'bg-purple-100 text-purple-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Groq (Fast)
+                    </button>
+                    <button
+                        onClick={() => setAiProvider("gemini")}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${aiProvider === 'gemini' ? 'bg-blue-100 text-blue-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Gemini
+                    </button>
+                </div>
+
+                <button 
+                    onClick={handleAiSuggest}
+                    disabled={isGenerating}
+                    className={`text-white px-6 py-2 rounded font-bold shadow disabled:opacity-50 transition-colors ${aiProvider === 'groq' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                    {isGenerating ? "Analyzing..." : "✨ AI Suggestions"}
+                </button>
+            </div>
+            {message && <p className="text-sm font-bold text-red-500">{message}</p>}
         </div>
 
         {/* AI Suggestions Box */}

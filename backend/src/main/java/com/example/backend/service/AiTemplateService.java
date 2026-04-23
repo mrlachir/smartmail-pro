@@ -6,11 +6,11 @@ import com.example.backend.security.EncryptionUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -25,119 +25,86 @@ public class AiTemplateService {
     @Autowired
     private EncryptionUtil encryptionUtil;
 
-    public String generateHtmlTemplate(String topic, String userEmail) {
-        // 1. Authenticate API Key
-        Vault vault = vaultRepository.findByUserEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("API Vault not configured. Please add your Gemini key in settings."));
+    // Inject the Groq key from application.properties
+    @Value("${groq.api.key}")
+    private String groqApiKey;
 
-        String apiKey;
-        try {
-            apiKey = encryptionUtil.decrypt(vault.getGeminiApiKeyEncrypted()).trim();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to decrypt Gemini API Key.");
-        }
+    public String generateHtmlTemplate(String topic, String provider, String userEmail) {
+        String prompt = "You are an expert, professional email designer. Create a highly converting, responsive HTML email template for: '" + topic + "'. "
+                + "CRITICAL RULES: 1. Use modern inline CSS. 2. DO NOT include any markdown formatting like ```html. "
+                + "3. Return ONLY the raw HTML code starting with <!DOCTYPE html> or <html>.";
 
-        if (apiKey.isEmpty()) throw new RuntimeException("API Key is empty.");
-
-        // 2. Strict HTML Prompt
-        String prompt = "You are an expert, professional email designer. Create a highly converting, responsive HTML email template for the following campaign context: '" + topic + "'. "
-                + "CRITICAL RULES: "
-                + "1. Use modern, clean inline CSS (standard for email clients). "
-                + "2. Include placeholder text (Lorem Ipsum) or relevant placeholder copy. "
-                + "3. DO NOT include any markdown formatting like ```html. "
-                + "4. Return ONLY the raw, pure HTML code starting with <!DOCTYPE html> or <html>.";
-
-        // 3. Prepare Request
-//        String baseUrl = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=)";
-//        String url = baseUrl + apiKey;
-        String baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
-        String url = baseUrl + apiKey;
-
-
-        ObjectMapper mapper = new ObjectMapper();
-        String requestBody;
-        try {
-            Map<String, Object> textPart = Map.of("text", prompt);
-            Map<String, Object> parts = Map.of("parts", List.of(textPart));
-            Map<String, Object> contents = Map.of("contents", List.of(parts));
-            requestBody = mapper.writeValueAsString(contents);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to construct AI request body.");
-        }
-
-        // 4. Fire Request
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-
-        try {
-            String response = restTemplate.postForObject(url, entity, String.class);
-            JsonNode rootNode = mapper.readTree(response);
-
-            if (!rootNode.has("candidates")) {
-                throw new RuntimeException("Google rejected the API request.");
-            }
-
-            String aiText = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
-
-            // Strip residual markdown just in case
-            if (aiText.startsWith("```html")) {
-                aiText = aiText.replace("```html", "").replace("```", "").trim();
-            } else if (aiText.startsWith("```")) {
-                aiText = aiText.replace("```", "").trim();
-            }
-
-            return aiText;
-
-        } catch (HttpStatusCodeException e) {
-            if (e.getStatusCode().value() == 503) {
-                throw new RuntimeException("Google's AI servers are overloaded. Please try again in 60 seconds.");
-            } else {
-                throw new RuntimeException("Google API Error: " + e.getStatusCode().value());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Unexpected AI Error: " + e.getMessage());
+        if ("groq".equalsIgnoreCase(provider)) {
+            return callGroqApi(prompt);
+        } else {
+            return callGeminiApi(prompt, userEmail);
         }
     }
 
-    // THE UPGRADE: Iterative Chatbot Refinement
-    public String refineHtmlTemplate(String currentHtml, String instructions, String userEmail) {
-        Vault vault = vaultRepository.findByUserEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("API Vault not configured."));
+    public String refineHtmlTemplate(String currentHtml, String instructions, String provider, String userEmail) {
+        String prompt = "Here is my current HTML email code:\n\n" + currentHtml + "\n\n"
+                + "Make these changes: '" + instructions + "'. "
+                + "CRITICAL RULES: 1. Keep the rest of the design intact. 2. DO NOT include markdown like ```html. "
+                + "3. Return ONLY the fully updated raw HTML code.";
 
-        String apiKey;
+        if ("groq".equalsIgnoreCase(provider)) {
+            return callGroqApi(prompt);
+        } else {
+            return callGeminiApi(prompt, userEmail);
+        }
+    }
+
+    // --- THE NEW GROQ ENGINE ---
+    private String callGroqApi(String prompt) {
+        if (groqApiKey == null || groqApiKey.isEmpty()) throw new RuntimeException("Groq API Key is missing in properties.");
+
+        String url = "https://api.groq.com/openai/v1/chat/completions";
+        ObjectMapper mapper = new ObjectMapper();
+        String requestBody;
+
         try {
-            apiKey = encryptionUtil.decrypt(vault.getGeminiApiKeyEncrypted()).trim();
+            Map<String, Object> message = Map.of("role", "user", "content", prompt);
+            Map<String, Object> requestMap = Map.of(
+                    "model", "llama-3.1-8b-instant",
+                    "messages", List.of(message),
+                    "temperature", 0.7
+            );
+            requestBody = mapper.writeValueAsString(requestMap);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to decrypt Gemini API Key.");
+            throw new RuntimeException("Failed to construct Groq request body.");
         }
 
-        if (apiKey.isEmpty()) throw new RuntimeException("API Key is empty.");
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey); // Groq uses Bearer token authentication
 
-        // Instruct Gemini to modify the existing code
-        String prompt = "You are an expert email developer. Here is my current HTML email code:\n\n"
-                + currentHtml + "\n\n"
-                + "The user wants you to make the following changes: '" + instructions + "'. "
-                + "CRITICAL RULES: "
-                + "1. Apply the changes perfectly while keeping the rest of the design intact. "
-                + "2. Maintain inline CSS. "
-                + "3. DO NOT include any markdown formatting like ```html. "
-                + "4. Return ONLY the fully updated raw HTML code starting with <!DOCTYPE html> or <html>.";
+        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
-        String baseUrl = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=)";
-        String url = baseUrl + apiKey;
+        try {
+            String response = restTemplate.postForObject(url, entity, String.class);
+            JsonNode rootNode = mapper.readTree(response);
+            String aiText = rootNode.path("choices").get(0).path("message").path("content").asText();
 
+            return cleanMarkdown(aiText);
+        } catch (Exception e) {
+            throw new RuntimeException("Groq AI Error: " + e.getMessage());
+        }
+    }
+
+    // --- YOUR EXISTING GEMINI ENGINE ---
+    private String callGeminiApi(String prompt, String userEmail) {
+        Vault vault = vaultRepository.findByUserEmail(userEmail).orElseThrow(() -> new RuntimeException("API Vault not configured."));
+        String apiKey;
+        try { apiKey = encryptionUtil.decrypt(vault.getGeminiApiKeyEncrypted()).trim(); }
+        catch (Exception e) { throw new RuntimeException("Failed to decrypt Gemini Key."); }
+
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
         ObjectMapper mapper = new ObjectMapper();
         String requestBody;
         try {
-            Map<String, Object> textPart = Map.of("text", prompt);
-            Map<String, Object> parts = Map.of("parts", List.of(textPart));
-            Map<String, Object> contents = Map.of("contents", List.of(parts));
-            requestBody = mapper.writeValueAsString(contents);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to construct AI request body.");
-        }
+            requestBody = mapper.writeValueAsString(Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))));
+        } catch (Exception e) { throw new RuntimeException("Failed to construct request."); }
 
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
@@ -148,21 +115,13 @@ public class AiTemplateService {
             String response = restTemplate.postForObject(url, entity, String.class);
             JsonNode rootNode = mapper.readTree(response);
             String aiText = rootNode.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+            return cleanMarkdown(aiText);
+        } catch (Exception e) { throw new RuntimeException("Gemini AI Error: " + e.getMessage()); }
+    }
 
-            if (aiText.startsWith("```html")) {
-                aiText = aiText.replace("```html", "").replace("```", "").trim();
-            } else if (aiText.startsWith("```")) {
-                aiText = aiText.replace("```", "").trim();
-            }
-            return aiText;
-        } catch (HttpStatusCodeException e) {
-            if (e.getStatusCode().value() == 503) {
-                throw new RuntimeException("Google's AI servers are overloaded. Please try again in 60 seconds.");
-            } else {
-                throw new RuntimeException("Google API Error: " + e.getStatusCode().value());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Unexpected AI Error: " + e.getMessage());
-        }
+    private String cleanMarkdown(String text) {
+        if (text.startsWith("```html")) return text.replace("```html", "").replace("```", "").trim();
+        if (text.startsWith("```")) return text.replace("```", "").trim();
+        return text.trim();
     }
 }
