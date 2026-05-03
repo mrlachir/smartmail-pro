@@ -42,3 +42,7 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+tasks.register('copySonarLibs', Copy) {
+	from configurations.runtimeClasspath
+	into "$buildDir/sonar-libs"
+}

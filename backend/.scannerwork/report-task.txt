@@ -1,0 +1,7 @@
+organization=mrlachir
+projectKey=mrlachir_test-sonar
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.86375
+dashboardUrl=https://sonarcloud.io/dashboard?id=mrlachir_test-sonar
+ceTaskId=AZ3ZrYduoMdhVtZaWa1N
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZ3ZrYduoMdhVtZaWa1N
