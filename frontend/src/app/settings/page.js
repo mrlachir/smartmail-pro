@@ -17,11 +17,18 @@ function SettingsContent() {
             headers: { "X-User-Email": session.user.email } // PASS IDENTIFIER
           });
           if (res.ok) {
-            const data = await res.json();
-            if (data && data.geminiApiKeyEncrypted) {
-              setIsConfigured(true);
-            }
-          }
+             // THE FIX: Read the raw text first to see if the backend actually sent anything
+             const text = await res.text(); 
+             if (text) { 
+               const data = JSON.parse(text);
+               if (data && data.geminiApiKeyEncrypted) {
+                 setIsConfigured(true);
+               }
+             } else {
+               // If the text is empty, the vault doesn't exist yet.
+               setIsConfigured(false); 
+             }
+           }
         } catch (error) {
           console.error("Backend not running or unreachable.", error);
         }
