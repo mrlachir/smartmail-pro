@@ -1,8 +1,10 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useSession, SessionProvider } from "next-auth/react";
 
 function SegmentsContent() {
+  const router = useRouter(); // <-- 1. Add this line
 
   const { data: session, status } = useSession();
   const [segments, setSegments] = useState([]);
@@ -236,8 +238,8 @@ const handleAiSuggest = async () => {
   if (!session) return <p className="p-8 text-red-500">Access Denied. Please log in first.</p>;
 
   return (
-    <div className="max-w-7xl mx-auto p-8 mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8 text-black">
-      
+    <div className="max-w-7xl mx-auto p-8 mt-10 text-black">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Left Column */}
       <div>
         <div className="flex flex-col items-end gap-2 mb-6">
@@ -490,6 +492,7 @@ const handleAiSuggest = async () => {
         </div>
       </div>
 
+      </div>
     </div>
   );
 }

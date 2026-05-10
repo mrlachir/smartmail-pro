@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface CampaignRepository extends JpaRepository<Campaign, Long> {
     List<Campaign> findByUserEmailOrderByCreatedAtDesc(String userEmail);
+    List<Campaign> findByStatusAndScheduledAtBefore(String status, java.time.LocalDateTime now);
 }

@@ -62,8 +62,7 @@ public class AiSegmentService {
                 + "\nCRITICAL RULE: The user already has these segments: [" + existingSegmentNames + "]. Do not suggest these. "
                 + "Invent 3 NEW distinct segments based on the data provided.\n"
                 + "You MUST return ONLY a raw JSON array of objects. Do not include any conversational text or markdown formatting.\n"
-                + "Structure: [ { \"name\": \"Segment Name\", \"description\": \"Why it works\", \"rules\": [ { \"column\": \"column_name\", \"operator\": \"=\", \"value\": \"target_value\" } ] } ]. "
-                + "Valid operators: =, !=, >, <, >=, <=.";
+                + "Return a JSON object with 'name', 'description', and 'rules'. The 'rules' must be a JSON array in this format: [{\"column\":\"attribute_name\", \"value\":\"attribute_value\"}].";
 
         if ("groq".equalsIgnoreCase(provider)) {
             return callGroqApi(prompt);

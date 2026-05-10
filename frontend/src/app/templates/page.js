@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useSession, SessionProvider } from "next-auth/react";
 import dynamic from "next/dynamic";
@@ -7,6 +8,7 @@ import dynamic from "next/dynamic";
 const EmailEditor = dynamic(() => import("../../components/EmailEditor"), { ssr: false });
 
 function TemplatesContent() {
+  const router = useRouter(); // <-- 1. Add this line
   const { data: session, status } = useSession();
   
   // --- TEMPLATE STATES ---

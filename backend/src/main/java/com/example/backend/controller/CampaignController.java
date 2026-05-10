@@ -38,47 +38,38 @@ public class CampaignController {
             Long templateId = Long.valueOf(payload.get("templateId").toString());
             String name = payload.get("name").toString();
             String subject = payload.get("subject").toString();
+            
+            // Extract the new Scheduled Date
+            String scheduledAtStr = payload.get("scheduledAt") != null ? payload.get("scheduledAt").toString() : null;
+            LocalDateTime scheduledAt = null;
+            if (scheduledAtStr != null && !scheduledAtStr.trim().isEmpty()) {
+                scheduledAt = LocalDateTime.parse(scheduledAtStr);
+            }
 
-            // 1. Fetch relations
-            Segment segment = segmentRepository.findById(segmentId)
-                    .orElseThrow(() -> new RuntimeException("Segment not found"));
-            Template template = templateRepository.findById(templateId)
-                    .orElseThrow(() -> new RuntimeException("Template not found"));
+            Segment segment = segmentRepository.findById(segmentId).orElseThrow(() -> new RuntimeException("Segment not found"));
+            Template template = templateRepository.findById(templateId).orElseThrow(() -> new RuntimeException("Template not found"));
 
-            // 2. Create the Campaign Record
             Campaign campaign = new Campaign();
             campaign.setName(name);
             campaign.setSubject(subject);
             campaign.setUserEmail(userEmail);
             campaign.setSegment(segment);
             campaign.setTemplate(template);
+            campaign.setScheduledAt(scheduledAt);
+
+            // LOGIC: If it has a future date, just save it and STOP. 
+            if (scheduledAt != null && scheduledAt.isAfter(LocalDateTime.now())) {
+                campaign.setStatus("SCHEDULED");
+                campaignRepository.save(campaign);
+                return ResponseEntity.ok(Map.of("message", "Campaign scheduled to launch at " + scheduledAt.toString()));
+            }
+
+            // LOGIC: If no date or past date, fire immediately
             campaign.setStatus("SENDING");
             campaign = campaignRepository.save(campaign);
 
-            // 3. Execute the Blast
-            // NOTE: Replace this mock email array with your actual segment.getSubscribers() logic
-            // once you connect your specific Subscriber mapping to Segments.
-            // For this test, we fire it to your own email so you can see it work.
-//            String[] targetEmails = { userEmail };
-//
-//            int sentCount = 0;
-//            for (String email : targetEmails) {
-//                try {
-//                    emailService.sendCampaignEmail(email, subject, template.getHtmlContent(), userEmail);
-//                    sentCount++;
-//                } catch (Exception e) {
-//                    // UPGRADE: Print the exact reason Resend rejected it
-//                    System.err.println("Failed to send to: " + email + " | Reason: " + e.getMessage());
-//                }
-//            }
-            // 3. Execute the Blast to your verified recipients
-            // 3. THE SANDBOX OVERRIDE
-            // We are forcing the target to the master account to bypass the 403 Error
-            // 3. Execute the Blast dynamically based on the Segment
-            List<String> targetEmails = segment.getSubscribers().stream()
-                    .map(sub -> sub.getEmail())
-                    .toList();
-
+            // Execute blast
+            List<String> targetEmails = segment.getSubscribers().stream().map(Subscriber::getEmail).toList();
             int sentCount = 0;
             for (String email : targetEmails) {
                 try {
@@ -89,12 +80,11 @@ public class CampaignController {
                 }
             }
 
-            // 4. Finalize
             campaign.setStatus(sentCount > 0 ? "SENT" : "FAILED");
             campaign.setSentAt(LocalDateTime.now());
             campaignRepository.save(campaign);
 
-            return ResponseEntity.ok(Map.of("message", "Campaign launched! Sent to " + sentCount + " recipients."));
+            return ResponseEntity.ok(Map.of("message", "Campaign launched immediately! Sent to " + sentCount + " recipients."));
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

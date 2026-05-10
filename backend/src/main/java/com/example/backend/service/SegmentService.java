@@ -28,7 +28,46 @@ public class SegmentService {
     public Segment saveSegment(Segment segment, String userEmail) {
         User user = userService.getOrCreateUser(userEmail);
         segment.setUser(user);
+
+        applyRulesAndLinkSubscribers(segment, userEmail);
+
         return segmentRepository.save(segment);
+    }
+
+    public void applyRulesAndLinkSubscribers(Segment segment, String userEmail) {
+        List<Subscriber> allSubscribers = subscriberRepository.findByUserEmail(userEmail);
+        List<Subscriber> matchedSubscribers = new java.util.ArrayList<>();
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        try {
+            String rulesStr = segment.getRules();
+            com.fasterxml.jackson.databind.JsonNode rulesNode = (rulesStr != null && !rulesStr.trim().isEmpty()) ? mapper.readTree(rulesStr) : null;
+
+            for (Subscriber sub : allSubscribers) {
+                java.util.Map<String, String> subAttrs = sub.getCustomAttributes();
+                if (rulesNode == null || rulesNode.isEmpty()) { matchedSubscribers.add(sub); continue; }
+                if (subAttrs == null || subAttrs.isEmpty()) continue;
+
+                boolean matchesAll = true;
+                if (rulesNode.isArray()) {
+                    for (com.fasterxml.jackson.databind.JsonNode rule : rulesNode) {
+                        String key = rule.has("column") ? rule.get("column").asText() : rule.get("key").asText();
+                        String expected = rule.get("value").asText();
+                        
+                        String actual;
+                        if (key.equalsIgnoreCase("status")) {
+                            actual = sub.getStatus();
+                        } else {
+                            actual = subAttrs != null ? subAttrs.get(key) : null;
+                        }
+                        
+                        if (actual == null || !actual.equalsIgnoreCase(expected)) { matchesAll = false; break; }
+                    }
+                }
+                if (matchesAll) matchedSubscribers.add(sub);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        segment.setSubscribers(new java.util.HashSet<>(matchedSubscribers));
     }
 
     public List<Segment> getAllSegments(String userEmail) {
