@@ -26,6 +26,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/media/**").permitAll() // ADD THIS
                         .requestMatchers("/uploads/**").permitAll()   // ADD THIS (Allows Next.js to view the physical images)
 
+                        .requestMatchers("/api/campaigns/**").permitAll()   // ADD THIS (Allows Next.js to view the physical images)
+
                         .anyRequest().authenticated()
                 );
         return http.build();

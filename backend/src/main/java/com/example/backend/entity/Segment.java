@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Data
@@ -34,4 +37,15 @@ public class Segment {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "segment_subscribers",
+            joinColumns = @JoinColumn(name = "segment_id"),
+            inverseJoinColumns = @JoinColumn(name = "subscriber_id")
+    )
+    private Set<Subscriber> subscribers = new HashSet<>();
+
+    public Set<Subscriber> getSubscribers() { return subscribers; }
+    public void setSubscribers(Set<Subscriber> subscribers) { this.subscribers = subscribers; }
 }

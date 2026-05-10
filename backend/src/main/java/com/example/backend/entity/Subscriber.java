@@ -43,4 +43,6 @@ public class Subscriber {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    public String getEmail() { return email; }
 }
