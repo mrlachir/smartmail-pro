@@ -2,6 +2,31 @@
 import { useState, useEffect } from "react";
 import { useSession, SessionProvider } from "next-auth/react";
 
+const CampaignStats = ({ campaignId, userEmail }) => {
+    const [stats, setStats] = useState(null);
+
+    useEffect(() => {
+        if (!campaignId || !userEmail) return;
+        
+        fetch(`http://localhost:8080/api/campaigns/${campaignId}/stats`, {
+            headers: { "X-User-Email": userEmail }
+        })
+        .then(res => res.json())
+        .then(data => setStats(data))
+        .catch(err => console.error("Failed to load stats", err));
+    }, [campaignId, userEmail]);
+
+    if (!stats) return <div className="text-xs text-gray-400 mt-2 animate-pulse">Loading telemetry...</div>;
+
+    return (
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs border-t pt-3 border-gray-100">
+            <div><span className="block text-lg font-bold text-gray-800">{stats.totalSent}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Sent</span></div>
+            <div><span className="block text-lg font-bold text-blue-600">{stats.uniqueOpens}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Opens</span></div>
+            <div><span className="block text-lg font-bold text-green-600">{stats.uniqueClicks}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Clicks</span></div>
+        </div>
+    );
+};
+
 function CampaignsContent() {
   const { data: session, status } = useSession();
   
@@ -244,6 +269,7 @@ function CampaignsContent() {
                                     {camp.status === 'SCHEDULED' ? new Date(camp.scheduledAt).toLocaleString() : new Date(camp.createdAt).toLocaleDateString()}
                                 </span>
                             </div>
+                            <CampaignStats campaignId={camp.id} userEmail={session.user.email} />
                         </div>
                     ))
                 )}

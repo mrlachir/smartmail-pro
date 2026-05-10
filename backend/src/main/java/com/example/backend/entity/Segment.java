@@ -46,6 +46,4 @@ public class Segment {
     )
     private Set<Subscriber> subscribers = new HashSet<>();
 
-    public Set<Subscriber> getSubscribers() { return subscribers; }
-    public void setSubscribers(Set<Subscriber> subscribers) { this.subscribers = subscribers; }
 }

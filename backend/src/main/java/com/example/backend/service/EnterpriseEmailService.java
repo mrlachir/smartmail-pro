@@ -18,8 +18,10 @@ public class EnterpriseEmailService {
     @Value("${resend.api.key}")
     private String resendApiKey;
 
-    public void sendCampaignEmail(String toEmail, String subject, String htmlContent, String replyToEmail) {
+    public void sendCampaignEmail(String toEmail, String subject, String htmlContent, String replyToEmail, Long campaignId, Long subscriberId) {
         try {
+            htmlContent = injectTracking(htmlContent, campaignId, subscriberId);
+            
             // 1. Construct the exact JSON payload expected by Resend
             Map<String, Object> payload = new HashMap<>();
 // The professional sender identity
@@ -52,5 +54,35 @@ public class EnterpriseEmailService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to fire email: " + e.getMessage());
         }
+    }
+
+    private String injectTracking(String html, Long campaignId, Long subscriberId) {
+        // THE EXACT BASE URL
+//        String baseUrl = "https://d14663f39f8767.lhr.life/api/track";
+        String baseUrl = "http://localhost:8080/api/track";
+
+        // 1. Rewrite Links (Regex to find href="http...")
+        String linkRegex = "href=[\"'](http[s]?://[^\"']+)[\"']";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(linkRegex).matcher(html);
+        StringBuilder sb = new StringBuilder();
+        
+        while (matcher.find()) {
+            String originalUrl = matcher.group(1);
+            String encodedUrl = java.net.URLEncoder.encode(originalUrl, java.nio.charset.StandardCharsets.UTF_8);
+            String trackingUrl = baseUrl + "/click/" + campaignId + "/" + subscriberId + "?url=" + encodedUrl;
+            matcher.appendReplacement(sb, "href=\"" + trackingUrl + "\"");
+        }
+        matcher.appendTail(sb);
+        html = sb.toString();
+
+        // 2. Inject Open Pixel (Guaranteed to have /api/track/open/...)
+        String pixel = "<img src=\"" + baseUrl + "/open/" + campaignId + "/" + subscriberId + "\" width=\"1\" height=\"1\" alt=\"\" style=\"display:none;\" />";
+        if (html.toLowerCase().contains("</body>")) {
+            html = html.replaceAll("(?i)</body>", pixel + "\n</body>");
+        } else {
+            html += "\n" + pixel;
+        }
+
+        return html;
     }
 }

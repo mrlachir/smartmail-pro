@@ -38,7 +38,9 @@ public class CampaignSchedulerService {
                         sub.getEmail(), 
                         campaign.getSubject(), 
                         campaign.getTemplate().getHtmlContent(), 
-                        campaign.getUserEmail()
+                        campaign.getUserEmail(),
+                        campaign.getId(),
+                        sub.getId()
                     );
                     count++;
                 }

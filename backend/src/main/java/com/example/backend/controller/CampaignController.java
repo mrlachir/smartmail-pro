@@ -3,7 +3,9 @@ package com.example.backend.controller;
 import com.example.backend.entity.Campaign;
 import com.example.backend.entity.Segment;
 import com.example.backend.entity.Template;
+import com.example.backend.dto.CampaignStatsDTO;
 import com.example.backend.repository.CampaignRepository;
+import com.example.backend.repository.EmailInteractionRepository;
 import com.example.backend.repository.SegmentRepository;
 import com.example.backend.repository.TemplateRepository;
 import com.example.backend.service.EnterpriseEmailService;
@@ -24,6 +26,7 @@ public class CampaignController {
     @Autowired private CampaignRepository campaignRepository;
     @Autowired private SegmentRepository segmentRepository;
     @Autowired private TemplateRepository templateRepository;
+    @Autowired private EmailInteractionRepository interactionRepository;
     @Autowired private EnterpriseEmailService emailService;
 
     @GetMapping
@@ -69,14 +72,13 @@ public class CampaignController {
             campaign = campaignRepository.save(campaign);
 
             // Execute blast
-            List<String> targetEmails = segment.getSubscribers().stream().map(Subscriber::getEmail).toList();
             int sentCount = 0;
-            for (String email : targetEmails) {
+            for (Subscriber sub : segment.getSubscribers()) {
                 try {
-                    emailService.sendCampaignEmail(email, subject, template.getHtmlContent(), userEmail);
+                    emailService.sendCampaignEmail(sub.getEmail(), subject, template.getHtmlContent(), userEmail, campaign.getId(), sub.getId());
                     sentCount++;
                 } catch (Exception e) {
-                    System.err.println("❌ Delivery Failed for: " + email + " | Reason: " + e.getMessage());
+                    System.err.println("❌ Delivery Failed for: " + sub.getEmail() + " | Reason: " + e.getMessage());
                 }
             }
 
@@ -86,6 +88,28 @@ public class CampaignController {
 
             return ResponseEntity.ok(Map.of("message", "Campaign launched immediately! Sent to " + sentCount + " recipients."));
 
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/stats")
+    public ResponseEntity<?> getCampaignStats(@PathVariable Long id, @RequestHeader("X-User-Email") String userEmail) {
+        try {
+            Campaign campaign = campaignRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Campaign not found"));
+
+            if (!campaign.getUserEmail().equals(userEmail)) {
+                return ResponseEntity.status(403).body(Map.of("message", "Unauthorized"));
+            }
+
+            long totalSent = campaign.getSegment() != null && campaign.getSegment().getSubscribers() != null 
+                ? campaign.getSegment().getSubscribers().size() : 0;
+            
+            long uniqueOpens = interactionRepository.countByCampaignIdAndInteractionType(id, "OPEN");
+            long uniqueClicks = interactionRepository.countByCampaignIdAndInteractionType(id, "CLICK");
+
+            return ResponseEntity.ok(new CampaignStatsDTO(id, totalSent, uniqueOpens, uniqueClicks));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
