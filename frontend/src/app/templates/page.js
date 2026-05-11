@@ -159,82 +159,84 @@ function TemplatesContent() {
   if (!session) return <p className="p-8 text-red-500">Access Denied. Log in.</p>;
 
   return (
-    <div className="max-w-[1600px] mx-auto p-4 md:p-8 mt-10 text-black">
-      
+    <div className="max-w-7xl mx-auto pb-12">
       {/* 1. Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Template Studio</h1>
-        {templateMessage && <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded border border-blue-100">{templateMessage}</span>}
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Studio de Templates</h1>
+          <p className="text-gray-500 mt-1">Concevez vos emails avec l'IA et gérez vos assets visuels.</p>
+        </div>
+        {templateMessage && <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">{templateMessage}</span>}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 mb-8">
         
         {/* 2. Left Column: Template AI & Saving */}
-        <div className="xl:col-span-1 space-y-4">
+        <div className="xl:col-span-1 space-y-6">
             {/* Save Block */}
-            <div className="bg-white p-4 rounded shadow border border-gray-100">
-                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Template Name</label>
-                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white" placeholder="e.g., Welcome Email" />
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Nom du Template</label>
+                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="ex: Email de Bienvenue" />
                     </div>
-                    <div className="flex gap-2">
-                        <button type="submit" className={`flex-1 py-2 font-bold text-sm rounded text-white ${editingId ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`}>
-                            {editingId ? "Update" : "Save"}
+                    <div className="flex flex-col gap-2">
+                        <button type="submit" className={`w-full py-3 font-medium rounded-lg text-white transition shadow-sm ${editingId ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                            {editingId ? "Mettre à jour" : "Enregistrer le Template"}
                         </button>
-                        {editingId && <button type="button" onClick={cancelEdit} className="px-3 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 border rounded">Cancel</button>}
+                        {editingId && <button type="button" onClick={cancelEdit} className="w-full px-3 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 border border-gray-200 rounded-lg transition">Annuler l'édition</button>}
                     </div>
                 </form>
             </div>
 
             {/* Template AI Block */}
-            <div className="bg-purple-50 p-4 rounded border border-purple-100">
-                <div className="flex justify-between items-center mb-2">
-                    <h2 className="font-bold text-purple-800 text-sm">✨ Template AI</h2>
+            <div className="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-100">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-purple-800 text-sm">✨ IA Template</h2>
                     <div className="flex bg-white rounded border border-purple-200 p-0.5">
-                        <button onClick={() => setAiTemplateProvider("groq")} className={`px-2 py-0.5 text-[10px] font-bold rounded ${aiTemplateProvider === 'groq' ? 'bg-purple-100 text-purple-800' : 'text-gray-500'}`}>Groq</button>
-                        <button onClick={() => setAiTemplateProvider("gemini")} className={`px-2 py-0.5 text-[10px] font-bold rounded ${aiTemplateProvider === 'gemini' ? 'bg-blue-100 text-blue-800' : 'text-gray-500'}`}>Gemini</button>
+                        <button onClick={() => setAiTemplateProvider("groq")} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${aiTemplateProvider === 'groq' ? 'bg-purple-100 text-purple-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Groq</button>
+                        <button onClick={() => setAiTemplateProvider("gemini")} className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${aiTemplateProvider === 'gemini' ? 'bg-blue-100 text-blue-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Gemini</button>
                     </div>
                 </div>
-                <input type="text" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Generate design..." className="w-full p-2 border rounded text-sm mb-2" />
-                <button onClick={handleTemplateAiGenerate} disabled={isAiLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-bold disabled:opacity-50">
-                    {isAiLoading ? "Generating..." : "Create Template"}
+                <input type="text" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Sujet du design..." className="w-full p-3 border border-purple-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <button onClick={handleTemplateAiGenerate} disabled={isAiLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition disabled:opacity-50">
+                    {isAiLoading ? "Génération en cours..." : "Créer le Template"}
                 </button>
-                <div className="mt-3 border-t border-purple-200 pt-3">
-                    <input type="text" value={refineInstructions} onChange={(e) => setRefineInstructions(e.target.value)} placeholder="Refine canvas..." className="w-full p-2 border rounded text-sm mb-2" disabled={!htmlContent} />
-                    <button onClick={handleTemplateAiRefine} disabled={isRefining || !htmlContent} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold disabled:opacity-50">
-                        {isRefining ? "Updating..." : "Apply Changes"}
+                <div className="mt-4 border-t border-purple-200 pt-4">
+                    <input type="text" value={refineInstructions} onChange={(e) => setRefineInstructions(e.target.value)} placeholder="Ajuster le design..." className="w-full p-3 border border-purple-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" disabled={!htmlContent} />
+                    <button onClick={handleTemplateAiRefine} disabled={isRefining || !htmlContent} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition disabled:opacity-50">
+                        {isRefining ? "Mise à jour..." : "Appliquer les Modifications"}
                     </button>
                 </div>
             </div>
         </div>
 
         {/* 3. Right Column: Media Manager & Canvas */}
-        <div className="xl:col-span-3 flex flex-col gap-4">
+        <div className="xl:col-span-3 flex flex-col gap-6">
             
             {/* The Unified Media Bar */}
-            <div className="bg-white rounded shadow border border-gray-100 p-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
                     <div>
-                        <h2 className="font-bold text-gray-800">🖼️ Media & Assets</h2>
-                        <p className="text-xs text-gray-500">Drag images directly into your canvas below.</p>
-                        {mediaMessage && <p className="text-xs font-bold text-blue-600 mt-1">{mediaMessage}</p>}
+                        <h2 className="font-bold text-gray-900">🖼️ Assets Visuels</h2>
+                        <p className="text-xs text-gray-500 mt-1">Glissez-déposez les images directement dans le canevas.</p>
+                        {mediaMessage && <p className="text-xs font-bold text-blue-600 mt-2">{mediaMessage}</p>}
                     </div>
 
                     {/* Media Generation & Upload Controls */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex bg-gray-100 rounded border border-gray-200 p-0.5">
-                            <button onClick={() => setAiMediaProvider("pollinations")} className={`px-2 py-1 text-[10px] font-bold rounded ${aiMediaProvider === 'pollinations' ? 'bg-white shadow text-purple-700' : 'text-gray-500'}`}>Free AI</button>
-                            <button onClick={() => setAiMediaProvider("gemini")} className={`px-2 py-1 text-[10px] font-bold rounded ${aiMediaProvider === 'gemini' ? 'bg-white shadow text-blue-700' : 'text-gray-500'}`}>Gemini</button>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex bg-gray-50 rounded-lg border border-gray-200 p-1">
+                            <button onClick={() => setAiMediaProvider("pollinations")} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${aiMediaProvider === 'pollinations' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}>IA Gratuite</button>
+                            <button onClick={() => setAiMediaProvider("gemini")} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${aiMediaProvider === 'gemini' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}>Gemini</button>
                         </div>
-                        <input type="text" value={aiMediaPrompt} onChange={(e) => setAiMediaPrompt(e.target.value)} placeholder="Image prompt..." className="w-48 p-1.5 border rounded text-xs" />
-                        <button onClick={handleMediaAiGenerate} disabled={isAiMediaGenerating || !aiMediaPrompt.trim()} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded text-xs font-bold disabled:opacity-50">
-                            {isAiMediaGenerating ? "..." : "Generate"}
+                        <input type="text" value={aiMediaPrompt} onChange={(e) => setAiMediaPrompt(e.target.value)} placeholder="Prompt de l'image..." className="w-48 p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                        <button onClick={handleMediaAiGenerate} disabled={isAiMediaGenerating || !aiMediaPrompt.trim()} className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition disabled:opacity-50">
+                            {isAiMediaGenerating ? "..." : "Générer"}
                         </button>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-gray-200 font-light text-xl">|</span>
                         <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                        <button onClick={() => fileInputRef.current.click()} disabled={isMediaUploading} className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold">
-                            {isMediaUploading ? "..." : "Upload"}
+                        <button onClick={() => fileInputRef.current.click()} disabled={isMediaUploading} className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition px-4 py-2 rounded-lg text-sm font-bold">
+                            {isMediaUploading ? "..." : "Téléverser"}
                         </button>
                     </div>
                 </div>
@@ -242,15 +244,14 @@ function TemplatesContent() {
                 {/* Draggable Gallery Grid */}
                 <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar items-center">
                     {mediaList.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic py-2">No images in your gallery.</p>
+                        <p className="text-sm text-gray-400 italic py-4">Aucune image dans votre galerie.</p>
                     ) : (
                         mediaList.map(media => (
                             <div key={media.id} className="flex-shrink-0 cursor-grab active:cursor-grabbing">
                                 <img 
                                     src={media.fileUrl} 
                                     alt={media.fileName} 
-                                    // THE FIX: Removed the absolute overlay div and moved hover effects directly to the image
-                                    className="h-20 w-20 object-cover border-2 border-gray-200 hover:border-blue-500 hover:opacity-80 rounded bg-white transition-all shadow-sm"
+                                    className="h-24 w-24 object-cover border-2 border-gray-100 hover:border-blue-500 hover:opacity-80 rounded-xl bg-white transition-all shadow-sm"
                                     draggable="true"
                                     onDragStart={(e) => {
                                         e.dataTransfer.setData('text/html', `<img src="${media.fileUrl}" style="max-width:100%; height:auto;" alt="uploaded asset"/>`);
@@ -263,26 +264,30 @@ function TemplatesContent() {
             </div>
 
             {/* Drag and Drop Canvas Workspace */}
-            <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-white min-h-[600px]">
+            <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm min-h-[600px]">
                 <EmailEditor initialHtml={htmlContent} onHtmlChange={setHtmlContent} />
             </div>
         </div>
       </div>
 
       {/* 4. Saved Templates List */}
-      <div className="bg-white rounded shadow border border-gray-100 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b font-bold text-gray-700">Your Saved Templates</div>
-        <table className="w-full text-sm text-left">
-          <tbody>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-bold text-gray-900">Vos Templates Enregistrés</h2>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <tbody className="divide-y divide-gray-100 text-sm">
             {templates.length === 0 ? (
-              <tr><td colSpan="2" className="p-6 text-center text-gray-500 font-medium">No templates saved yet.</td></tr>
+              <tr><td colSpan="2" className="p-8 text-center text-gray-500 font-medium">Aucun template enregistré pour le moment.</td></tr>
             ) : (
               templates.map(tmpl => (
-                <tr key={tmpl.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-bold text-gray-800">{tmpl.name}</td>
-                  <td className="p-4 text-right space-x-4">
-                    <button onClick={() => handleEdit(tmpl)} className="text-blue-600 font-bold hover:underline">Edit</button>
-                    <button onClick={() => handleDelete(tmpl.id)} className="text-red-500 font-bold hover:underline">Delete</button>
+                <tr key={tmpl.id} className="hover:bg-gray-50 transition">
+                  <td className="p-4 font-bold text-gray-900">{tmpl.name}</td>
+                  <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2">
+                          <button onClick={() => handleEdit(tmpl)} className="text-blue-600 font-bold hover:underline text-xs bg-blue-50 px-3 py-1.5 rounded-lg transition">Modifier</button>
+                          <button onClick={() => handleDelete(tmpl.id)} className="text-red-600 font-bold hover:underline text-xs bg-red-50 px-3 py-1.5 rounded-lg transition">Supprimer</button>
+                      </div>
                   </td>
                 </tr>
               ))

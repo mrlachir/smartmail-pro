@@ -114,4 +114,27 @@ public class CampaignController {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
+
+    @org.springframework.transaction.annotation.Transactional
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteCampaign(@PathVariable Long id, @RequestHeader("X-User-Email") String userEmail) {
+        try {
+            Campaign campaign = campaignRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Campaign not found in database."));
+
+            if (!campaign.getUserEmail().equals(userEmail)) {
+                return ResponseEntity.status(403).body(Map.of("message", "Unauthorized to delete this campaign."));
+            }
+
+            // 1. Wipe the telemetry data first to prevent SQL constraint violations
+            interactionRepository.deleteByCampaignId(campaign.getId());
+            
+            // 2. Delete the campaign
+            campaignRepository.delete(campaign);
+            
+            return ResponseEntity.ok(Map.of("message", "Campaign deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
 }

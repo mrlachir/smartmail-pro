@@ -16,13 +16,13 @@ const CampaignStats = ({ campaignId, userEmail }) => {
         .catch(err => console.error("Failed to load stats", err));
     }, [campaignId, userEmail]);
 
-    if (!stats) return <div className="text-xs text-gray-400 mt-2 animate-pulse">Loading telemetry...</div>;
+    if (!stats) return <div className="text-xs text-gray-400 mt-2 animate-pulse">Chargement de la télémétrie...</div>;
 
     return (
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs border-t pt-3 border-gray-100">
-            <div><span className="block text-lg font-bold text-gray-800">{stats.totalSent}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Sent</span></div>
-            <div><span className="block text-lg font-bold text-blue-600">{stats.uniqueOpens}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Opens</span></div>
-            <div><span className="block text-lg font-bold text-green-600">{stats.uniqueClicks}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Clicks</span></div>
+            <div><span className="block text-lg font-bold text-gray-800">{stats.totalSent}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Envoyés</span></div>
+            <div><span className="block text-lg font-bold text-blue-600">{stats.uniqueOpens}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Ouvertures</span></div>
+            <div><span className="block text-lg font-bold text-green-600">{stats.uniqueClicks}</span><span className="text-gray-500 uppercase text-[10px] tracking-wider">Clics</span></div>
         </div>
     );
 };
@@ -66,12 +66,36 @@ function CampaignsContent() {
       setStep(1); setName(""); setSubject(""); setSegmentId(""); setTemplateId(""); setScheduledAt(""); setLaunchType("now"); setMessage("");
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette campagne définitivement ?")) {
+      try {
+        const res = await fetch(`http://localhost:8080/api/campaigns/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'X-User-Email': session?.user?.email
+          }
+        });
+
+        if (res.ok) {
+          setCampaigns(prevList => prevList.filter(camp => camp.id !== id));
+        } else {
+          // READ THE ACTUAL ERROR FROM SPRING BOOT
+          const errorData = await res.json();
+          console.error("Backend error:", errorData.message);
+          alert(`Erreur: ${errorData.message}`);
+        }
+      } catch (error) {
+        console.error("API error:", error);
+      }
+    }
+  };
+
   const handleLaunch = async () => {
-    if (!segmentId || !templateId || !name || !subject) return setMessage("❌ Missing required fields.");
-    if (launchType === "later" && !scheduledAt) return setMessage("❌ Please select a date and time.");
+    if (!segmentId || !templateId || !name || !subject) return setMessage("❌ Champs requis manquants.");
+    if (launchType === "later" && !scheduledAt) return setMessage("❌ Veuillez sélectionner une date et une heure.");
 
     setIsLaunching(true); 
-    setMessage(launchType === "later" ? "🗓️ Scheduling campaign..." : "🚀 Igniting payload via Resend...");
+    setMessage(launchType === "later" ? "🗓️ Planification de la campagne..." : "🚀 Lancement via Resend...");
 
     try {
       const res = await fetch("http://localhost:8080/api/campaigns/launch", {
@@ -86,29 +110,35 @@ function CampaignsContent() {
         setTimeout(() => { resetWizard(); }, 4000);
       } else {
         const text = await res.text();
-        try { const err = JSON.parse(text); setMessage(`❌ Error: ${err.message}`); } 
-        catch (e) { setMessage(`❌ Server Error ${res.status}`); }
+        try { const err = JSON.parse(text); setMessage(`❌ Erreur: ${err.message}`); } 
+        catch (e) { setMessage(`❌ Erreur Serveur ${res.status}`); }
       }
-    } catch (error) { setMessage(`❌ Network Error.`); } 
+    } catch (error) { setMessage(`❌ Erreur Réseau.`); } 
     finally { setIsLaunching(false); }
   };
 
   if (status === "loading") return <p className="p-8">Loading...</p>;
-  if (!session) return <p className="p-8 text-red-500">Access Denied. Log in.</p>;
+  if (!session) return <p className="p-8 text-red-500">Accès Refusé. Veuillez vous connecter.</p>;
 
   // Helper to find selected segment details
   const selectedSegment = segments.find(s => s.id === segmentId);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 mt-10">
+    <div className="max-w-7xl mx-auto pb-12">
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Campagnes</h1>
+          <p className="text-gray-500 mt-1">Créez, planifiez et analysez vos envois d'emails.</p>
+        </div>
+      </div>
+
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Campaign Studio</h1>
-        <div className="flex items-center justify-between bg-white p-4 rounded shadow border border-gray-100">
-            {['Setup', 'Audience', 'Design', 'Schedule'].map((label, index) => {
+        <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            {['Configuration', 'Audience', 'Design', 'Planification'].map((label, index) => {
                 const stepNumber = index + 1;
                 return (
                     <div key={label} className={`flex flex-col items-center flex-1 ${stepNumber !== 4 ? 'border-r border-gray-100' : ''}`}>
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm mb-2 transition-colors ${step >= stepNumber ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm mb-2 transition-colors ${step >= stepNumber ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500'}`}>
                             {stepNumber}
                         </div>
                         <span className={`text-xs font-bold uppercase tracking-wider ${step >= stepNumber ? 'text-blue-800' : 'text-gray-400'}`}>{label}</span>
@@ -119,32 +149,33 @@ function CampaignsContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded shadow border border-gray-100 min-h-[500px] flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex-grow">
+        {/* Main Wizard Column */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col overflow-hidden">
+            <div className="p-8 border-b border-gray-100 flex-grow">
                 
                 {/* STEP 1: SETUP */}
                 {step === 1 && (
-                    <div className="space-y-4 animate-fadeIn">
-                        <h2 className="text-xl font-bold text-gray-800">Campaign Details</h2>
+                    <div className="space-y-6 animate-fadeIn">
+                        <h2 className="text-xl font-bold text-gray-900">Détails de la Campagne</h2>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Campaign Name</label>
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border rounded bg-gray-50 focus:bg-white" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Nom de la Campagne</label>
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="Ex: Promotion Été 2026" />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Subject Line</label>
-                            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full p-3 border rounded bg-gray-50 focus:bg-white" />
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Ligne d'Objet (Sujet de l'email)</label>
+                            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="Ex: Découvrez nos nouvelles offres !" />
                         </div>
                     </div>
                 )}
 
                 {/* STEP 2: AUDIENCE (LIST VIEW) */}
                 {step === 2 && (
-                    <div className="space-y-4 animate-fadeIn">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Target Audience</h2>
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-900">Audience Cible</h2>
                             <div className="flex items-center gap-4">
-                                <button onClick={() => fetchData("segments", setSegments)} className="text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">🔄 Refresh List</button>
-                                <a href="/segments" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800">+ Create New Segment ↗</a>
+                                <button onClick={() => fetchData("segments", setSegments)} className="text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">🔄 Actualiser</button>
+                                <a href="/segments" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">+ Créer un Segment ↗</a>
                             </div>
                         </div>
                         
@@ -152,10 +183,10 @@ function CampaignsContent() {
                             {segments.map(seg => {
                                 const count = seg.subscribers ? seg.subscribers.length : 0;
                                 return (
-                                <div key={seg.id} onClick={() => setSegmentId(seg.id)} className={`p-4 border rounded-lg cursor-pointer transition-all ${segmentId === seg.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'hover:bg-gray-50 border-gray-200'}`}>
-                                    <h3 className="font-bold text-gray-800 text-lg">{seg.name}</h3>
-                                    <div className="mt-2 inline-block bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full font-bold">
-                                        👤 {count} Subscribers
+                                <div key={seg.id} onClick={() => setSegmentId(seg.id)} className={`p-5 border rounded-xl cursor-pointer transition-all ${segmentId === seg.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                                    <h3 className="font-bold text-gray-900 text-lg">{seg.name}</h3>
+                                    <div className="mt-3 inline-block bg-white text-gray-700 text-xs px-3 py-1.5 rounded-full font-bold border border-gray-200 shadow-sm">
+                                        👤 {count} Abonnés
                                     </div>
                                 </div>
                             )})}
@@ -163,14 +194,14 @@ function CampaignsContent() {
 
                         {/* Expandable Subscriber List */}
                         {selectedSegment && (
-                            <div className="mt-6 border-t pt-4">
-                                <h4 className="text-sm font-bold text-gray-600 mb-2">Previewing recipients for: {selectedSegment.name}</h4>
-                                <div className="bg-gray-50 rounded border max-h-[150px] overflow-y-auto">
+                            <div className="mt-8 border-t border-gray-100 pt-6">
+                                <h4 className="text-sm font-bold text-gray-700 mb-3">Aperçu des destinataires pour : {selectedSegment.name}</h4>
+                                <div className="bg-gray-50 rounded-xl border border-gray-200 max-h-[150px] overflow-y-auto">
                                     {(selectedSegment.subscribers || []).map((sub, i) => (
-                                        <div key={i} className="text-xs p-2 border-b last:border-0 text-gray-700 font-mono">{sub.email}</div>
+                                        <div key={i} className="text-xs p-3 border-b border-gray-100 last:border-0 text-gray-600 font-mono">{sub.email}</div>
                                     ))}
                                     {(!selectedSegment.subscribers || selectedSegment.subscribers.length === 0) && (
-                                        <div className="text-xs p-3 text-red-500 font-bold">⚠️ This segment has no subscribers. Emails will not send.</div>
+                                        <div className="text-xs p-4 text-red-600 bg-red-50 font-bold rounded-xl">⚠️ Ce segment n'a aucun abonné. Les emails ne seront pas envoyés.</div>
                                     )}
                                 </div>
                             </div>
@@ -180,23 +211,23 @@ function CampaignsContent() {
 
                 {/* STEP 3: DESIGN (THUMBNAIL GRID) */}
                 {step === 3 && (
-                    <div className="space-y-4 animate-fadeIn">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Email Design</h2>
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-900">Design de l'Email</h2>
                             <div className="flex items-center gap-4">
-                                <button onClick={() => fetchData("templates", setTemplates)} className="text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">🔄 Refresh List</button>
-                                <a href="/templates" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800">+ Studio / AI Generator ↗</a>
+                                <button onClick={() => fetchData("templates", setTemplates)} className="text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">🔄 Actualiser</button>
+                                <a href="/templates" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">+ Studio IA ↗</a>
                             </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-5 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                             {templates.map(tmpl => (
-                                <div key={tmpl.id} onClick={() => setTemplateId(tmpl.id)} className={`group relative border rounded-lg overflow-hidden cursor-pointer transition-all h-48 ${templateId === tmpl.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'}`}>
+                                <div key={tmpl.id} onClick={() => setTemplateId(tmpl.id)} className={`group relative border rounded-xl overflow-hidden cursor-pointer transition-all h-48 ${templateId === tmpl.id ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}>
                                     {/* Thumbnail Iframe Hack */}
                                     <div className="w-full h-[140px] bg-white overflow-hidden relative pointer-events-none">
                                         <iframe srcDoc={tmpl.htmlContent} className="w-[400%] h-[400%] origin-top-left scale-[0.25] absolute top-0 left-0 border-0" tabIndex="-1" />
                                     </div>
-                                    <div className={`p-2 border-t text-xs font-bold text-center truncate ${templateId === tmpl.id ? 'bg-blue-50 text-blue-800' : 'bg-gray-50 text-gray-700 group-hover:bg-gray-100'}`}>
+                                    <div className={`p-3 border-t border-gray-100 text-xs font-bold text-center truncate transition-colors ${templateId === tmpl.id ? 'bg-blue-50 text-blue-800' : 'bg-gray-50 text-gray-700 group-hover:bg-gray-100'}`}>
                                         {tmpl.name}
                                     </div>
                                 </div>
@@ -208,66 +239,75 @@ function CampaignsContent() {
                 {/* STEP 4: SCHEDULE & REVIEW */}
                 {step === 4 && (
                     <div className="space-y-6 animate-fadeIn">
-                        <h2 className="text-xl font-bold text-gray-800">Delivery Schedule</h2>
+                        <h2 className="text-xl font-bold text-gray-900">Planification de l'Envoi</h2>
                         
                         <div className="flex gap-4">
-                            <label className={`flex-1 border p-4 rounded-lg cursor-pointer ${launchType === 'now' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'hover:bg-gray-50'}`}>
-                                <input type="radio" name="launchType" value="now" checked={launchType === 'now'} onChange={() => setLaunchType('now')} className="mr-2" />
-                                <span className="font-bold text-gray-800">Blast Immediately</span>
+                            <label className={`flex-1 border p-5 rounded-xl cursor-pointer transition-all ${launchType === 'now' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                                <input type="radio" name="launchType" value="now" checked={launchType === 'now'} onChange={() => setLaunchType('now')} className="mr-3" />
+                                <span className="font-bold text-gray-900">Envoyer Immédiatement</span>
                             </label>
-                            <label className={`flex-1 border p-4 rounded-lg cursor-pointer ${launchType === 'later' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'hover:bg-gray-50'}`}>
-                                <input type="radio" name="launchType" value="later" checked={launchType === 'later'} onChange={() => setLaunchType('later')} className="mr-2" />
-                                <span className="font-bold text-gray-800">Schedule for Later</span>
+                            <label className={`flex-1 border p-5 rounded-xl cursor-pointer transition-all ${launchType === 'later' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                                <input type="radio" name="launchType" value="later" checked={launchType === 'later'} onChange={() => setLaunchType('later')} className="mr-3" />
+                                <span className="font-bold text-gray-900">Planifier pour plus tard</span>
                             </label>
                         </div>
 
                         {launchType === 'later' && (
-                            <div className="p-4 bg-gray-50 border rounded-lg animate-fadeIn">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Select Release Date & Time</label>
-                                <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full p-3 border rounded bg-white" />
+                            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl animate-fadeIn">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Sélectionner la Date et l'Heure</label>
+                                <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full p-3 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
                             </div>
                         )}
 
-                        {message && <div className="text-sm font-bold text-center p-3 rounded bg-blue-50 text-blue-800 border border-blue-200">{message}</div>}
+                        {message && (
+                            <div className={`text-sm font-bold text-center p-4 rounded-xl border ${message.includes('❌') ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-800 border-blue-200'}`}>
+                                {message}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center rounded-b">
-                {step > 1 ? <button onClick={() => setStep(step - 1)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded">← Back</button> : <div></div>}
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                {step > 1 ? <button onClick={() => setStep(step - 1)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-lg transition-colors">← Précédent</button> : <div></div>}
                 {step < 4 ? (
-                    <button onClick={() => setStep(step + 1)} disabled={(step === 1 && (!name || !subject)) || (step === 2 && !segmentId) || (step === 3 && !templateId)} className="px-6 py-2 bg-gray-800 hover:bg-black text-white text-sm font-bold rounded disabled:opacity-50">
-                        Continue →
+                    <button onClick={() => setStep(step + 1)} disabled={(step === 1 && (!name || !subject)) || (step === 2 && !segmentId) || (step === 3 && !templateId)} className="px-8 py-2.5 bg-gray-900 hover:bg-black text-white text-sm font-bold rounded-lg shadow-sm disabled:opacity-50 transition-colors">
+                        Continuer →
                     </button>
                 ) : (
-                    <button onClick={handleLaunch} disabled={isLaunching} className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded uppercase tracking-wider shadow-lg disabled:opacity-50">
-                        {isLaunching ? "Initiating..." : launchType === 'now' ? "Launch Now 🚀" : "Confirm Schedule 🗓️"}
+                    <button onClick={handleLaunch} disabled={isLaunching} className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg uppercase tracking-wider shadow-md hover:shadow-lg disabled:opacity-50 transition-all">
+                        {isLaunching ? "Initialisation..." : launchType === 'now' ? "Lancer Maintenant 🚀" : "Confirmer la Planification 🗓️"}
                     </button>
                 )}
             </div>
         </div>
 
         {/* History Column */}
-        <div className="lg:col-span-1 bg-white rounded shadow border border-gray-100 overflow-hidden h-fit">
-            <div className="p-4 bg-gray-50 border-b font-bold text-gray-700 flex justify-between items-center">
-                <span>Recent Campaigns</span>
-                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">{campaigns.length}</span>
+        <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-fit">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="font-bold text-gray-900">Campagnes Récentes</h2>
+                <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-full font-bold">{campaigns.length}</span>
             </div>
-            <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-                {campaigns.length === 0 ? <p className="p-6 text-center text-gray-500 text-sm font-medium">No campaigns launched yet.</p> : (
+            <div className="max-h-[600px] overflow-y-auto custom-scrollbar divide-y divide-gray-100">
+                {campaigns.length === 0 ? <p className="p-8 text-center text-gray-500 text-sm font-medium">Aucune campagne lancée.</p> : (
                     campaigns.map(camp => (
-                        <div key={camp.id} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                            <div className="font-bold text-gray-800 text-sm">{camp.name}</div>
-                            <div className="text-xs text-gray-500 mb-2 truncate">{camp.subject}</div>
-                            <div className="flex justify-between items-center">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold 
+                        <div key={camp.id} className="p-5 hover:bg-gray-50 transition-colors group">
+                            <div className="font-bold text-gray-900 text-sm">{camp.name}</div>
+                            <div className="text-xs text-gray-500 mb-3 truncate">{camp.subject}</div>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase
                                     ${camp.status === 'SENT' ? 'bg-green-100 text-green-700' : 
                                       camp.status === 'SCHEDULED' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
                                     {camp.status}
                                 </span>
-                                <span className="text-gray-400 text-[10px]">
-                                    {camp.status === 'SCHEDULED' ? new Date(camp.scheduledAt).toLocaleString() : new Date(camp.createdAt).toLocaleDateString()}
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-gray-400 text-xs font-medium">
+                                      {camp.status === 'SCHEDULED' ? new Date(camp.scheduledAt).toLocaleString() : new Date(camp.createdAt).toLocaleDateString()}
+                                  </span>
+                                  <button onClick={() => handleDelete(camp.id)} className="text-gray-300 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                  </button>
+                                </div>
                             </div>
                             <CampaignStats campaignId={camp.id} userEmail={session.user.email} />
                         </div>

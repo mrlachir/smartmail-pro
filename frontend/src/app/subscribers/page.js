@@ -108,75 +108,98 @@ function SubscribersContent() {
   if (!session) return <p className="p-8 text-red-500">Access Denied. Please log in first.</p>;
 
   return (
-    <div className="max-w-4xl mx-auto p-8 mt-10 bg-white rounded shadow text-black">
-      <h1 className="text-2xl font-bold mb-6">Subscriber Management</h1>
+    <div className="max-w-7xl mx-auto pb-12">
+      {/* Header */}
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Gestion des Abonnés</h1>
+          <p className="text-gray-500 mt-1">Importez vos listes de contacts et surveillez l'état de votre audience.</p>
+        </div>
+      </div>
       
-      <div className="mb-8 p-6 border-2 border-dashed border-gray-300 rounded text-center bg-gray-50">
-        <h2 className="text-lg font-semibold mb-2">Import CSV Contacts</h2>
-        <p className="text-sm text-gray-500 mb-4">Format Requirement: Email, FirstName, LastName</p>
-        
-        <form onSubmit={handleUpload} className="space-y-4 max-w-md mx-auto">
-          <input 
-            id="csvFileInput"
-            type="file" 
-            accept=".csv" 
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? "Importing..." : "Upload & Import"}
-          </button>
-        </form>
-        {message && <p className="mt-4 font-medium">{message}</p>}
+      {/* CSV Import Block */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+        <div className="p-6">
+          <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-50">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Importer des Contacts CSV</h2>
+            <p className="text-sm text-gray-500 mb-6">Format requis : Email, Prénom, Nom</p>
+            
+            <form onSubmit={handleUpload} className="space-y-4 max-w-md mx-auto">
+              <input 
+                id="csvFileInput"
+                type="file" 
+                accept=".csv" 
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition"
+              />
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition disabled:opacity-50"
+              >
+                {loading ? "Importation en cours..." : "Téléverser & Importer"}
+              </button>
+            </form>
+            {message && (
+              <div className="mt-4 inline-block px-4 py-2 rounded-lg bg-white border border-gray-100 shadow-sm">
+                <p className={`font-bold text-sm ${message.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+                  {message}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <h2 className="text-xl font-bold mb-4">Subscriber List ({subscribers.length})</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-200 text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border border-gray-200 p-2 text-left">Email</th>
-              <th className="border border-gray-200 p-2 text-left">First Name</th>
-              <th className="border border-gray-200 p-2 text-left">Last Name</th>
-              <th className="border border-gray-200 p-2 text-left">Status</th>
-              <th className="border border-gray-200 p-2 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subscribers.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="border border-gray-200 p-4 text-center text-gray-500">
-                  No subscribers found. Upload a CSV to get started.
-                </td>
+      {/* Subscribers Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-900">Liste des Abonnés ({subscribers.length})</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="p-4 font-semibold">Email</th>
+                <th className="p-4 font-semibold">Prénom</th>
+                <th className="p-4 font-semibold">Nom</th>
+                <th className="p-4 font-semibold">Statut</th>
+                <th className="p-4 font-semibold text-center">Actions</th>
               </tr>
-            ) : (
-              subscribers.map((sub) => (
-                <tr key={sub.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-200 p-2">{sub.email}</td>
-                  <td className="border border-gray-200 p-2">{sub.firstName || "-"}</td>
-                  <td className="border border-gray-200 p-2">{sub.lastName || "-"}</td>
-                  <td className="border border-gray-200 p-2">
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                      {sub.status}
-                    </span>
-                  </td>
-                  <td className="border border-gray-200 p-2 text-center">
-                    <button 
-                      onClick={() => handleDelete(sub.id)}
-                      className="text-red-600 hover:text-red-800 font-medium cursor-pointer"
-                    >
-                      Delete
-                    </button>
+            </thead>
+            <tbody className="divide-y divide-gray-100 text-sm">
+              {subscribers.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-gray-500 font-medium">
+                    Aucun abonné trouvé. Téléversez un CSV pour commencer.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                subscribers.map((sub) => (
+                  <tr key={sub.id} className="hover:bg-gray-50 transition">
+                    <td className="p-4 font-bold text-gray-900">{sub.email}</td>
+                    <td className="p-4 text-gray-600">{sub.firstName || "-"}</td>
+                    <td className="p-4 text-gray-600">{sub.lastName || "-"}</td>
+                    <td className="p-4">
+                      <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                        {sub.status || "Actif"}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <button 
+                        onClick={() => handleDelete(sub.id)}
+                        className="text-gray-400 hover:text-red-600 transition p-1 rounded-md hover:bg-red-50 inline-flex items-center justify-center"
+                        title="Supprimer l'abonné"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

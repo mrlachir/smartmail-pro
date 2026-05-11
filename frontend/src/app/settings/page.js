@@ -65,34 +65,53 @@ function SettingsContent() {
   if (!session) return <p className="p-8 text-red-500">Access Denied. Please log in first.</p>;
 
   return (
-    <div className="max-w-2xl mx-auto p-8 mt-10 bg-white rounded shadow text-black">
-      <h1 className="text-2xl font-bold mb-6">API Vault Settings</h1>
+    <div className="max-w-7xl mx-auto pb-12">
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">API Vault</h1>
+          <p className="text-gray-500 mt-1">Gérez vos clés API et vos intégrations d'Intelligence Artificielle en toute sécurité.</p>
+        </div>
+      </div>
       
-      <div className="mb-6 p-6 border rounded bg-gray-50 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Google Gemini API</h2>
-            <p className="text-sm">
-              Status: {isConfigured ? <span className="text-green-600 font-bold bg-green-100 px-2 py-1 rounded">Configured ✅</span> : <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded">Not Configured ❌</span>}
-            </p>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-3xl">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">Google Gemini API</h2>
+              <div>
+                {isConfigured ? (
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Configuré ✅</span>
+                ) : (
+                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">Non Configuré ❌</span>
+                )}
+              </div>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Nécessaire pour les fonctionnalités d'analyse d'audience et de génération de design de SmartMail Pro.</p>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Update Gemini API Key</label>
-            <input 
-              type="password" 
-              value={apiKey} 
-              onChange={(e) => setApiKey(e.target.value)} 
-              placeholder="Paste your key here..." 
-              className="w-full p-2 border rounded"
-              required
-            />
-          </div>
-          <button type="submit" className="w-full py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700">
-            Save to Encrypted Vault
-          </button>
-        </form>
-        {message && <p className="mt-4 text-sm font-medium text-center">{message}</p>}
+        <div className="p-6 bg-gray-50">
+          <form onSubmit={handleSave} className="space-y-5">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Clé API Gemini</label>
+              <input 
+                type="password" 
+                value={apiKey} 
+                onChange={(e) => setApiKey(e.target.value)} 
+                placeholder="Collez votre clé secrète ici (commence par AIza...)" 
+                className="w-full p-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-2">Votre clé est chiffrée (AES-256) avant d'être sauvegardée dans la base de données.</p>
+            </div>
+            <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition">
+              Enregistrer dans le Vault Sécurisé
+            </button>
+          </form>
+          {message && (
+            <div className={`mt-4 p-3 rounded-lg text-sm font-bold border text-center ${message.includes('❌') ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+              {message}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
