@@ -71,7 +71,7 @@ public class SubscriberController {
                 
                 subscriberRepository.findById(subId).ifPresent(sub -> {
                     // Only return if they belong to this user's segment/account
-                    if (sub.getUserEmail().equals(userEmail)) {
+                    if (sub.getUser() != null && sub.getUser().getEmail().equals(userEmail)) {
                         result.add(Map.of(
                             "email", sub.getEmail(),
                             "interactions", count,

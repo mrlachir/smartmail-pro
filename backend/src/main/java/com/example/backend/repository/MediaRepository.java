@@ -8,5 +8,6 @@ import java.util.List;
 
 @Repository
 public interface MediaRepository extends JpaRepository<Media, Long> {
+    // Media.user is a @ManyToOne → User; navigate to User.email via "UserEmail"
     List<Media> findByUserEmail(String email);
-}
+}
