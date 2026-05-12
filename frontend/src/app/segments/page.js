@@ -3,6 +3,17 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useSession, SessionProvider } from "next-auth/react";
 
+// Maps raw operators → human-readable French labels.
+// The raw symbols (=, >, etc.) are still stored in state and sent to the backend unchanged.
+const OPERATOR_LABELS = {
+  '=':  'est égal à',
+  '!=': "n'est pas égal à",
+  '>':  'est supérieur à',
+  '<':  'est inférieur à',
+  '>=': 'est supérieur ou égal à',
+  '<=': 'est inférieur ou égal à',
+};
+
 function SegmentsContent() {
   const router = useRouter(); 
 
@@ -346,7 +357,7 @@ const handleAiSuggest = async () => {
                 </div>
 
                 {rules.map((rule, index) => (
-                    <div key={index} className="flex gap-2 items-center bg-white p-2 border border-gray-200 rounded-lg shadow-sm">
+                    <div key={index} className="flex items-center gap-1 p-3 bg-slate-50 rounded-lg border border-slate-100">
                         <select 
                             value={rule.column} 
                             onChange={(e) => handleRuleChange(index, "column", e.target.value)} 
@@ -357,17 +368,14 @@ const handleAiSuggest = async () => {
                             ))}
                         </select>
                         
-                        <select 
-                            value={rule.operator} 
-                            onChange={(e) => handleRuleChange(index, "operator", e.target.value)} 
-                            className="w-20 p-2 border border-gray-200 rounded-md bg-white font-mono text-center text-sm focus:outline-none"
+                        <select
+                            value={rule.operator}
+                            onChange={(e) => handleRuleChange(index, "operator", e.target.value)}
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                         >
-                            <option value="=">=</option>
-                            <option value="!=">!=</option>
-                            <option value=">">&gt;</option>
-                            <option value="<">&lt;</option>
-                            <option value=">=">&gt;=</option>
-                            <option value="<=">&lt;=</option>
+                            {Object.entries(OPERATOR_LABELS).map(([op, label]) => (
+                                <option key={op} value={op}>{label}</option>
+                            ))}
                         </select>
                         
                         <input 
@@ -383,7 +391,7 @@ const handleAiSuggest = async () => {
                             <button 
                                 type="button" 
                                 onClick={() => handleRemoveRule(index)}
-                                className="text-gray-400 hover:text-red-600 transition p-1 rounded-md hover:bg-red-50 inline-flex items-center justify-center"
+                                className="text-gray-400 hover:text-red-600 transition p-1 rounded-md hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             </button>
@@ -412,7 +420,7 @@ const handleAiSuggest = async () => {
               ) : (
                 segments.map(seg => (
                   <tr key={seg.id} className="hover:bg-gray-50 transition">
-                    <td className="p-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-gray-900">{seg.name}</span>
                         {seg.byAi === 'ai' ? (
@@ -424,13 +432,23 @@ const handleAiSuggest = async () => {
                       
                       {seg.description && <div className="text-xs text-gray-500 mt-1">{seg.description}</div>} 
                       
-                      <div className="text-xs text-gray-400 font-mono mt-2 space-y-1 bg-gray-50 p-2 rounded inline-block">
-                        {Array.isArray(JSON.parse(seg.rules)) 
-                            ? JSON.parse(seg.rules).map((r, i) => (
-                                <div key={i}>ET {r.column} {r.operator} {r.value}</div>
-                              ))
-                            : <span>Format hérité (une seule règle)</span>
-                        }
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(seg.rules);
+                            const rulesArr = Array.isArray(parsed) ? parsed : [parsed];
+                            return rulesArr.map((r, i) => (
+                              <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600">
+                                {i > 0 && <span className="text-slate-400 font-mono text-[10px] uppercase">ET</span>}
+                                <span className="font-semibold text-slate-700">{r.column}</span>
+                                <span className="text-blue-600">{OPERATOR_LABELS[r.operator] || r.operator}</span>
+                                <span className="font-semibold text-slate-700">{r.value}</span>
+                              </span>
+                            ));
+                          } catch {
+                            return <span className="text-gray-400 text-xs">Format hérité</span>;
+                          }
+                        })()}
                       </div>
                     </td>
                     
@@ -469,19 +487,28 @@ const handleAiSuggest = async () => {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider sticky top-0">
                     <tr>
-                      <th className="p-4 font-semibold">Email</th>
-                      <th className="p-4 font-semibold">Données Personnalisées</th>
+                      <th className="p-4 font-semibold w-full">Email</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
                     {evaluatedSubscribers.length === 0 ? (
-                      <tr><td colSpan="2" className="p-4 text-center text-gray-500">Aucun abonné correspondant.</td></tr>
+                      <tr><td className="p-4 text-center text-gray-500">Aucun abonné correspondant.</td></tr>
                     ) : (
                       evaluatedSubscribers.map(sub => (
                         <tr key={sub.id} className="hover:bg-gray-50 transition">
-                          <td className="p-4 font-bold text-gray-900">{sub.email}</td>
-                          <td className="p-4 text-xs text-gray-600 font-mono">
-                            {JSON.stringify(sub.customAttributes)}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs uppercase shadow-sm">
+                                {sub.email.charAt(0)}
+                              </div>
+                              <div className="ml-3">
+                                <p className="text-sm font-medium text-gray-900">{sub.email}</p>
+                                <div className="flex items-center mt-0.5">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5"></div>
+                                  <p className="text-xs text-gray-500">Abonné actif</p>
+                                </div>
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       ))
