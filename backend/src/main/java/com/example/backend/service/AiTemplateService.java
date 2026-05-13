@@ -30,28 +30,80 @@ public class AiTemplateService {
     private String groqApiKey;
 
     public String generateHtmlTemplate(String topic, String provider, String userEmail) {
-        String prompt = "You are an expert, professional email designer. Create a highly converting, responsive HTML email template for: '" + topic + "'. "
-                + "CRITICAL RULES: 1. Use modern inline CSS. 2. DO NOT include any markdown formatting like ```html. "
-                + "3. Return ONLY the raw HTML code starting with <!DOCTYPE html> or <html>.";
+        String systemRules = "You are a premium SaaS email designer. You MUST return ONLY raw, valid HTML. "
+                + "CRITICAL RULES:\n"
+                + "1. NO <style> blocks. NO <div> tags. NO classes. You MUST use strict <table> layouts and inline CSS (style=\"...\") exclusively.\n"
+                + "2. You MUST use this EXACT skeleton as the base for your output:\n\n"
+                + "<!DOCTYPE html>\n"
+                + "<html>\n"
+                + "<head>\n"
+                + "  <meta charset=\"utf-8\">\n"
+                + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+                + "</head>\n"
+                + "<body style=\"margin: 0; padding: 0; background-color: #f8fafc; font-family: Arial, sans-serif;\">\n"
+                + "  <table width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f8fafc; padding:40px 0;\">\n"
+                + "    <tr><td align=\"center\">\n"
+                + "      <table width=\"100%\" max-width=\"600\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px; background-color:#ffffff; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.05); overflow:hidden;\">\n"
+                + "        \n"
+                + "        <tr><td align=\"center\" style=\"padding:30px; background-color:#0f172a; color:#ffffff; font-size:24px; font-weight:bold;\">HEADER HERE</td></tr>\n"
+                + "        <tr><td style=\"padding:30px; color:#334155; font-size:16px; line-height:1.6;\">CONTENT HERE</td></tr>\n"
+                + "      </table>\n"
+                + "    </td></tr>\n"
+                + "  </table>\n"
+                + "</body>\n"
+                + "</html>\n\n"
+                + "3. ALL buttons MUST be built as a <table> inside a <td> with a background color. Never just an <a> tag.\n"
+                + "4. Make the design modern, clean, and professional.\n"
+                + "Generate the requested email by populating and extending this exact skeleton. Return ONLY the HTML code. Do NOT wrap in markdown.";
+        String prompt = systemRules + "\n\nNow generate a highly converting, professional email template for: '" + topic + "'.";
 
+        String rawHtml;
         if ("groq".equalsIgnoreCase(provider)) {
-            return callGroqApi(prompt);
+            rawHtml = callGroqApi(prompt);
         } else {
-            return callGeminiApi(prompt, userEmail);
+            rawHtml = callGeminiApi(prompt, userEmail);
         }
+        return ensureHtmlBoilerplate(rawHtml);
     }
 
     public String refineHtmlTemplate(String currentHtml, String instructions, String provider, String userEmail) {
-        String prompt = "Here is my current HTML email code:\n\n" + currentHtml + "\n\n"
-                + "Make these changes: '" + instructions + "'. "
-                + "CRITICAL RULES: 1. Keep the rest of the design intact. 2. DO NOT include markdown like ```html. "
-                + "3. Return ONLY the fully updated raw HTML code.";
+        String systemRules = "You are a premium SaaS email designer. You MUST return ONLY raw, valid HTML. "
+                + "CRITICAL RULES:\n"
+                + "1. NO <style> blocks. NO <div> tags. NO classes. You MUST use strict <table> layouts and inline CSS (style=\"...\") exclusively.\n"
+                + "2. You MUST use this EXACT skeleton as the base for your output:\n\n"
+                + "<!DOCTYPE html>\n"
+                + "<html>\n"
+                + "<head>\n"
+                + "  <meta charset=\"utf-8\">\n"
+                + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+                + "</head>\n"
+                + "<body style=\"margin: 0; padding: 0; background-color: #f8fafc; font-family: Arial, sans-serif;\">\n"
+                + "  <table width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f8fafc; padding:40px 0;\">\n"
+                + "    <tr><td align=\"center\">\n"
+                + "      <table width=\"100%\" max-width=\"600\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px; background-color:#ffffff; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.05); overflow:hidden;\">\n"
+                + "        \n"
+                + "        <tr><td align=\"center\" style=\"padding:30px; background-color:#0f172a; color:#ffffff; font-size:24px; font-weight:bold;\">HEADER HERE</td></tr>\n"
+                + "        <tr><td style=\"padding:30px; color:#334155; font-size:16px; line-height:1.6;\">CONTENT HERE</td></tr>\n"
+                + "      </table>\n"
+                + "    </td></tr>\n"
+                + "  </table>\n"
+                + "</body>\n"
+                + "</html>\n\n"
+                + "3. ALL buttons MUST be built as a <table> inside a <td> with a background color. Never just an <a> tag.\n"
+                + "4. Make the design modern, clean, and professional.\n"
+                + "Generate the requested email by populating and extending this exact skeleton. Return ONLY the HTML code. Do NOT wrap in markdown.";
+        String prompt = systemRules
+                + "\n\nHere is the current HTML email:\n\n" + currentHtml + "\n\n"
+                + "Apply these changes: '" + instructions + "'. Preserve all existing <table> structure and inline styles. "
+                + "Return the fully updated raw HTML only.";
 
+        String rawHtml;
         if ("groq".equalsIgnoreCase(provider)) {
-            return callGroqApi(prompt);
+            rawHtml = callGroqApi(prompt);
         } else {
-            return callGeminiApi(prompt, userEmail);
+            rawHtml = callGeminiApi(prompt, userEmail);
         }
+        return ensureHtmlBoilerplate(rawHtml);
     }
 
     // --- THE NEW GROQ ENGINE ---
@@ -123,5 +175,33 @@ public class AiTemplateService {
         if (text.startsWith("```html")) return text.replace("```html", "").replace("```", "").trim();
         if (text.startsWith("```")) return text.replace("```", "").trim();
         return text.trim();
+    }
+
+    private String ensureHtmlBoilerplate(String htmlContent) {
+        if (htmlContent == null) return "";
+
+        String trimmedContent = htmlContent.trim();
+        if (trimmedContent.equalsIgnoreCase("null") || trimmedContent.isEmpty()) {
+            return "";
+        }
+        
+        String lowerCaseHtml = trimmedContent.toLowerCase();
+        
+        // If it already has the doctype or html tag, trust it and return
+        if (lowerCaseHtml.startsWith("<!doctype html>") || lowerCaseHtml.startsWith("<html>")) {
+            return htmlContent;
+        }
+
+        // If it's missing, wrap the LLM's raw table output in the unbreakable email shell
+        return "<!DOCTYPE html>\n"
+             + "<html>\n"
+             + "<head>\n"
+             + "  <meta charset=\"utf-8\">\n"
+             + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+             + "</head>\n"
+             + "<body style=\"margin: 0; padding: 0; background-color: #f8fafc; font-family: Arial, sans-serif; -webkit-font-smoothing: antialiased;\">\n"
+             + "  " + htmlContent + "\n"
+             + "</body>\n"
+             + "</html>";
     }
 }
